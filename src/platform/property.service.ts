@@ -24,6 +24,8 @@ export class PropertyService {
   }
 
   async create(agencyId: string, input: PropertyCreate) {
+    const prior = await this.db.query<{status:string}>('SELECT status FROM properties WHERE agency_id=$1 AND source_ref=$2',[agencyId,input.sourceRef]);
+    const listingStatus = prior.rows[0]?.status ?? 'available';
     const content = this.toKnowledgeText(input);
     const indexed = await this.ingestion.upsert({
       title: input.title,
@@ -34,7 +36,7 @@ export class PropertyService {
       metadata: {
         purpose: input.purpose, propertyType: input.propertyType, county: input.county,
         location: [input.area,input.town,input.county].filter(Boolean).join(', '),
-        price: input.price, currency: 'KES', bedrooms: input.bedrooms,
+        price: input.price, currency: 'KES', listingStatus, bedrooms: input.bedrooms,
         bathrooms: input.bathrooms, sizeSqm: input.sizeSqm,
       },
     }, agencyId);
@@ -52,6 +54,9 @@ export class PropertyService {
         [agencyId,input.sourceRef,input.title,input.description,input.purpose,input.propertyType,input.county,
           input.town??null,input.area??null,input.price,input.bedrooms??null,input.bathrooms??null,input.sizeSqm??null,input.language],
       );
+      if (['let','sold','inactive'].includes(result.rows[0].status)) {
+        await this.ingestion.deactivate('property_listing',input.sourceRef,agencyId);
+      }
       return {...result.rows[0],knowledgeDocumentId:indexed.documentId};
     } catch (error) {
       throw error;
@@ -83,7 +88,7 @@ export class PropertyService {
     } else {
       await this.ingestion.upsert({title:p.title,category:'property_listing',language:p.language,sourceRef:p.sourceRef,
         content:this.toKnowledgeText({...p,sourceRef:p.sourceRef,price:Number(p.price),propertyType:p.propertyType} as PropertyCreate),
-        metadata:{purpose:p.purpose,propertyType:p.propertyType,county:p.county,location:[p.area,p.town,p.county].filter(Boolean).join(', '),price:Number(p.price),currency:'KES',bedrooms:p.bedrooms,bathrooms:p.bathrooms,sizeSqm:p.sizeSqm}},agencyId);
+        metadata:{purpose:p.purpose,propertyType:p.propertyType,county:p.county,location:[p.area,p.town,p.county].filter(Boolean).join(', '),price:Number(p.price),currency:'KES',listingStatus:status,bedrooms:p.bedrooms,bathrooms:p.bathrooms,sizeSqm:p.sizeSqm}},agencyId);
     }
     return {id, status};
   }
