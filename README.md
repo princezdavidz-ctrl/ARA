@@ -11,6 +11,9 @@ NestJS + TypeScript backend for a Kenyan real-estate agency. Includes tenant-sco
 ## Property management
 Authenticated agency users can manage structured property records through `GET /platform/properties`, `POST /platform/properties`, `PATCH /platform/properties/:id`, and `POST /platform/properties/:id/status`. Property records are tenant-scoped and indexed into the agency's RAG knowledge base. Supported statuses: `available`, `reserved`, `let`, `sold`, `inactive`. Listing availability and pricing must be kept current by agency staff.
 
+## Lead management
+Authenticated users can create, view, update and track agency leads through `GET/POST /platform/leads`, `GET/PATCH /platform/leads/:id`, `POST /platform/leads/:id/status`, and `POST /platform/leads/:id/notes`. Leads support contact details, source channel, rent/sale interest, linked property or conversation, KES budget range, team assignment, pipeline status and follow-up time. Only owners, admins and managers can assign leads. Lead records and notes are tenant-scoped and changes are written to the agency audit log.
+
 ## Key API
 - `POST /platform/register`: create agency owner; returns generated agency slug.
 - `POST /platform/login`: requires `agencySlug,email,password`.

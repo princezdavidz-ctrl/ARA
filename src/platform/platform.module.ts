@@ -4,5 +4,7 @@ import { PlatformService } from './platform.service';
 import { AuthGuard } from './auth.guard';
 import { ConfigService } from '../config/config.service';
 import { DatabaseService } from '../database/database.service';
-@Module({ controllers: [PlatformController], providers: [PlatformService, AuthGuard, ConfigService, DatabaseService], exports: [AuthGuard] })
+import { LeadController } from './lead.controller';
+import { LeadService } from './lead.service';
+@Module({ controllers: [PlatformController, LeadController], providers: [PlatformService, LeadService, AuthGuard, ConfigService, DatabaseService], exports: [AuthGuard] })
 export class PlatformModule {}
