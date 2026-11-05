@@ -17,6 +17,10 @@ const schema = z.object({
   WHATSAPP_VERIFY_TOKEN: z.preprocess(value => value === '' ? undefined : value, z.string().min(32).optional()),
   WHATSAPP_APP_SECRET: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
   WHATSAPP_ACCESS_TOKEN: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
+  EMAIL_AGENCY_ID: z.preprocess(value => value === '' ? undefined : value, z.string().uuid().optional()),
+  EMAIL_RESEND_API_KEY: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
+  EMAIL_FROM_ADDRESS: z.preprocess(value => value === '' ? undefined : value, z.string().email().optional()),
+  EMAIL_WEBHOOK_SECRET: z.preprocess(value => value === '' ? undefined : value, z.string().min(32).optional()),
   WHATSAPP_API_VERSION: z.string().regex(/^v\d+\.\d+$/).default('v27.0'),
 });
 export type Config = z.infer<typeof schema>;
