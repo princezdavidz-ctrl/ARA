@@ -1,11 +1,12 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { z } from 'zod';
 
+const optionalSecret = z.preprocess(value => value === '' ? undefined : value, z.string().min(20).optional());
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
   DATABASE_URL: z.string().url(),
-  OPENAI_API_KEY: z.string().min(20),
+  OPENAI_API_KEY: optionalSecret,
   OPENAI_CHAT_MODEL: z.string().default('gpt-4o-mini'),
   OPENAI_EMBEDDING_MODEL: z.string().default('text-embedding-3-small'),
   INGESTION_API_KEY: z.string().min(32),
@@ -46,21 +47,13 @@ export class ConfigService implements OnModuleInit {
     if (inboundConfigured && !(wa.WHATSAPP_AGENCY_ID && wa.WHATSAPP_PHONE_NUMBER_ID && wa.WHATSAPP_VERIFY_TOKEN && wa.WHATSAPP_APP_SECRET)) {
       throw new Error('Inbound WhatsApp webhooks require WHATSAPP_AGENCY_ID, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_VERIFY_TOKEN and WHATSAPP_APP_SECRET.');
     }
-    if (wa.WHATSAPP_ACCESS_TOKEN && !(wa.WHATSAPP_AGENCY_ID && wa.WHATSAPP_PHONE_NUMBER_ID)) {
-      throw new Error('Outbound WhatsApp delivery requires WHATSAPP_AGENCY_ID and WHATSAPP_PHONE_NUMBER_ID.');
-    }
+    if (wa.WHATSAPP_ACCESS_TOKEN && !(wa.WHATSAPP_AGENCY_ID && wa.WHATSAPP_PHONE_NUMBER_ID)) throw new Error('Outbound WhatsApp delivery requires WHATSAPP_AGENCY_ID and WHATSAPP_PHONE_NUMBER_ID.');
     const emailAny = Boolean(wa.EMAIL_AGENCY_ID || wa.EMAIL_RESEND_API_KEY || wa.EMAIL_FROM_ADDRESS || wa.EMAIL_WEBHOOK_SECRET);
-    if (emailAny && !(wa.EMAIL_AGENCY_ID && wa.EMAIL_RESEND_API_KEY && wa.EMAIL_FROM_ADDRESS && wa.EMAIL_WEBHOOK_SECRET)) {
-      throw new Error('Email channel requires EMAIL_AGENCY_ID, EMAIL_RESEND_API_KEY, EMAIL_FROM_ADDRESS and EMAIL_WEBHOOK_SECRET together.');
-    }
+    if (emailAny && !(wa.EMAIL_AGENCY_ID && wa.EMAIL_RESEND_API_KEY && wa.EMAIL_FROM_ADDRESS && wa.EMAIL_WEBHOOK_SECRET)) throw new Error('Email channel requires EMAIL_AGENCY_ID, EMAIL_RESEND_API_KEY, EMAIL_FROM_ADDRESS and EMAIL_WEBHOOK_SECRET together.');
     const igAny = Boolean(wa.INSTAGRAM_AGENCY_ID || wa.INSTAGRAM_ACCOUNT_ID || wa.INSTAGRAM_ACCESS_TOKEN || wa.INSTAGRAM_APP_SECRET || wa.INSTAGRAM_VERIFY_TOKEN);
-    if (igAny && !(wa.INSTAGRAM_AGENCY_ID && wa.INSTAGRAM_ACCOUNT_ID && wa.INSTAGRAM_ACCESS_TOKEN && wa.INSTAGRAM_APP_SECRET && wa.INSTAGRAM_VERIFY_TOKEN)) {
-      throw new Error('Instagram requires INSTAGRAM_AGENCY_ID, INSTAGRAM_ACCOUNT_ID, INSTAGRAM_ACCESS_TOKEN, INSTAGRAM_APP_SECRET and INSTAGRAM_VERIFY_TOKEN together.');
-    }
+    if (igAny && !(wa.INSTAGRAM_AGENCY_ID && wa.INSTAGRAM_ACCOUNT_ID && wa.INSTAGRAM_ACCESS_TOKEN && wa.INSTAGRAM_APP_SECRET && wa.INSTAGRAM_VERIFY_TOKEN)) throw new Error('Instagram requires INSTAGRAM_AGENCY_ID, INSTAGRAM_ACCOUNT_ID, INSTAGRAM_ACCESS_TOKEN, INSTAGRAM_APP_SECRET and INSTAGRAM_VERIFY_TOKEN together.');
     const ttAny = Boolean(wa.TIKTOK_AGENCY_ID || wa.TIKTOK_BUSINESS_ID || wa.TIKTOK_ACCESS_TOKEN || wa.TIKTOK_WEBHOOK_SECRET);
-    if (ttAny && !(wa.TIKTOK_AGENCY_ID && wa.TIKTOK_BUSINESS_ID && wa.TIKTOK_ACCESS_TOKEN && wa.TIKTOK_WEBHOOK_SECRET)) {
-      throw new Error('TikTok requires TIKTOK_AGENCY_ID, TIKTOK_BUSINESS_ID, TIKTOK_ACCESS_TOKEN and TIKTOK_WEBHOOK_SECRET together.');
-    }
+    if (ttAny && !(wa.TIKTOK_AGENCY_ID && wa.TIKTOK_BUSINESS_ID && wa.TIKTOK_ACCESS_TOKEN && wa.TIKTOK_WEBHOOK_SECRET)) throw new Error('TikTok requires TIKTOK_AGENCY_ID, TIKTOK_BUSINESS_ID, TIKTOK_ACCESS_TOKEN and TIKTOK_WEBHOOK_SECRET together.');
     this.value = wa;
   }
   get<K extends keyof Config>(key: K): Config[K] { return this.value[key]; }
