@@ -14,6 +14,9 @@ Authenticated agency users can manage structured property records through `GET /
 ## Lead management
 Authenticated users can create, view, update and track agency leads through `GET/POST /platform/leads`, `GET/PATCH /platform/leads/:id`, `POST /platform/leads/:id/status`, and `POST /platform/leads/:id/notes`. Leads support contact details, source channel, rent/sale interest, linked property or conversation, KES budget range, team assignment, pipeline status and follow-up time. Only owners, admins and managers can assign leads. Lead records and notes are tenant-scoped and changes are written to the agency audit log.
 
+## Agency dashboard
+Open `/dashboard` after starting the API. The browser workspace supports agency login, overview metrics, lead search and status updates, lead creation, property inventory, conversation lists and team directory. It uses the authenticated platform API and keeps access/refresh tokens in browser local storage; sign out revokes the refresh token. The dashboard is intentionally served by NestJS and adds no separate frontend runtime or build dependency. Team directory access follows the backend role policy. Conversation outbound delivery remains unavailable until a channel delivery adapter is configured.
+
 ## Key API
 - `POST /platform/register`: create agency owner; returns generated agency slug.
 - `POST /platform/login`: requires `agencySlug,email,password`.
