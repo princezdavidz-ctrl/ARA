@@ -1,7 +1,6 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { z } from 'zod';
 
-const optionalEnv = (schema: z.ZodTypeAny) => z.preprocess(value => value === '' ? undefined : value, schema.optional());
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
@@ -13,10 +12,10 @@ const schema = z.object({
   JWT_SECRET: z.string().min(32),
   RAG_TOP_K: z.coerce.number().int().min(1).max(20).default(6),
   RAG_MIN_SIMILARITY: z.coerce.number().min(0).max(1).default(0.28),
-  WHATSAPP_AGENCY_ID: optionalEnv(z.string().uuid()),
-  WHATSAPP_PHONE_NUMBER_ID: optionalEnv(z.string().min(1)),
-  WHATSAPP_VERIFY_TOKEN: optionalEnv(z.string().min(32)),
-  WHATSAPP_APP_SECRET: optionalEnv(z.string().min(1)),
+  WHATSAPP_AGENCY_ID: z.preprocess(value => value === '' ? undefined : value, z.string().uuid().optional()),
+  WHATSAPP_PHONE_NUMBER_ID: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
+  WHATSAPP_VERIFY_TOKEN: z.preprocess(value => value === '' ? undefined : value, z.string().min(32).optional()),
+  WHATSAPP_APP_SECRET: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
 });
 export type Config = z.infer<typeof schema>;
 
