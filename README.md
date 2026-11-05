@@ -3,30 +3,23 @@
 NestJS + TypeScript backend for a Kenyan real-estate agency. Includes tenant-scoped RAG, agency accounts, team access, conversations and a PostgreSQL-backed inbound AI worker.
 
 ## Setup
-1. Copy `.env.example` to `.env`; set OpenAI key, 32+ character ingestion key and JWT secret.
-2. Start PostgreSQL: `docker compose up -d db`.
-3. Apply SQL migrations in order: `001_init.sql`, `002_platform.sql`, `003_tenant_rag.sql`, `004_message_worker.sql`, `005_worker_recovery.sql`, `006_properties.sql`, `007_leads.sql`.
-4. Run `npm ci`, `npm run build`, `npm test`, then `npm run start:dev`.
+1. Copy .env.example to .env; set OpenAI key, 32+ character ingestion key and JWT secret.
+2. Start PostgreSQL with docker compose up -d db.
+3. Apply SQL migrations 001_init.sql through 008_whatsapp_outbound_delivery.sql in order.
+4. Run npm ci, npm run build, npm test, then npm run start:dev.
 
-## Property management
-Authenticated agency users can manage structured property records through `GET /platform/properties`, `POST /platform/properties`, `PATCH /platform/properties/:id`, and `POST /platform/properties/:id/status`. Property records are tenant-scoped and indexed into the agency's RAG knowledge base. Supported statuses: `available`, `reserved`, `let`, `sold`, `inactive`. Listing availability and pricing must be kept current by agency staff.
-
-## Lead management
-Authenticated users can create, view, update and track agency leads through `GET/POST /platform/leads`, `GET/PATCH /platform/leads/:id`, `POST /platform/leads/:id/status`, and `POST /platform/leads/:id/notes`. Leads support contact details, source channel, rent/sale interest, linked property or conversation, KES budget range, team assignment, pipeline status and follow-up time. Only owners, admins and managers can assign leads. Lead records and notes are tenant-scoped and changes are written to the agency audit log.
+## Property and lead management
+Authenticated agency users can manage tenant-scoped property inventory and lead pipelines through the /platform/properties and /platform/leads endpoints. Property records are indexed into the agency RAG knowledge base. Listing availability and pricing must be kept current by agency staff.
 
 ## Agency dashboard
-Open `/dashboard` after starting the API. The browser workspace supports agency login, overview metrics, lead search and status updates, lead creation, property inventory, conversation lists and team directory. It uses the authenticated platform API and keeps access/refresh tokens in browser local storage; sign out revokes the refresh token. The dashboard is intentionally served by NestJS and adds no separate frontend runtime or build dependency. Team directory access follows the backend role policy. Conversation outbound delivery remains unavailable until a channel delivery adapter is configured.
+Open /dashboard after starting the API. The browser workspace supports agency login, overview metrics, leads, property inventory, conversations and team directory. It uses authenticated platform APIs. Conversation messages show their current delivery status; queued is not proof of delivery.
 
-## Key API
-- `POST /platform/register`: create agency owner; returns generated agency slug.
-- `POST /platform/login`: requires `agencySlug,email,password`.
-- `POST /platform/refresh` and `POST /platform/logout`.
-- Authenticated `POST /knowledge`: add/update a knowledge document in the caller's agency.
-- Authenticated `POST /answer`: answer using only that agency's indexed knowledge.
-- Authenticated platform routes: `/platform/team`, `/platform/conversations`, `/platform/escalations`.
+## Message processing and WhatsApp
+Inbound text messages are processed by the tenant-scoped RAG worker. AI replies and human outbound messages for WhatsApp conversations are sent through Meta's WhatsApp Cloud API when WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID are configured. Without these values, messages remain queued for handling in the dashboard; WhatsApp is optional.
 
-## Message processing
-Post an inbound message to `POST /platform/conversations/:id/messages` with `{direction:"inbound",body,idempotencyKey}`. A database polling worker claims pending inbound messages using `FOR UPDATE SKIP LOCKED`, invokes tenant-scoped RAG, stores an AI reply and opens an escalation when RAG returns `needs_human`. The AI reply is queued in the database; it is not delivered externally.
+The worker marks a message sent only after Meta accepts it and returns a message ID. This is API acceptance, not confirmed recipient delivery; webhook delivery receipts are not yet reconciled. Transient failures retry with exponential backoff for up to five attempts; permanent 4xx errors other than 429 are marked failed. Meta's customer-service window and template-message rules apply, so Meta can reject free-form messages outside the permitted window. A worker crash after Meta accepts a message but before ARA saves the response can cause a duplicate on retry (at-least-once delivery).
 
-## Safety and production status
-All tenant knowledge writes and retrievals use the agency ID from a verified access token. Existing NULL-tenant documents are not exposed. WhatsApp inbound webhook support is available when the four WhatsApp environment variables are configured. This first adapter intentionally maps one configured WhatsApp phone number to one agency; it verifies Meta's GET challenge and POST HMAC signature, deduplicates webhook message IDs, and queues inbound text for the tenant RAG worker. Non-text media is recorded as a human-review placeholder and is not interpreted. Outbound WhatsApp delivery is not implemented yet. The worker runs inside the API process; deploy a single worker-enabled instance or add a dedicated worker lease before horizontal scaling. Apply migrations and run build, unit, integration and security tests before production. Use HTTPS, rate limiting, secrets management, backups and monitoring.
+Inbound webhook setup remains separate and requires WHATSAPP_AGENCY_ID, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_VERIFY_TOKEN and WHATSAPP_APP_SECRET. It maps one configured WhatsApp phone number to one agency, verifies Meta's challenge and HMAC signature, deduplicates webhook message IDs, and queues inbound text. Non-text media is escalated for human review and is not interpreted.
+
+## Production status
+The worker runs inside the API process; use one worker-enabled instance or add a dedicated worker lease before horizontal scaling. Apply migrations and run build, unit, integration and security tests before production. Use HTTPS, rate limiting, secrets management, backups and monitoring.

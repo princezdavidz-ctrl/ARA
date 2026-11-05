@@ -16,6 +16,8 @@ const schema = z.object({
   WHATSAPP_PHONE_NUMBER_ID: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
   WHATSAPP_VERIFY_TOKEN: z.preprocess(value => value === '' ? undefined : value, z.string().min(32).optional()),
   WHATSAPP_APP_SECRET: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
+  WHATSAPP_ACCESS_TOKEN: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
+  WHATSAPP_API_VERSION: z.string().regex(/^v\d+\.\d+$/).default('v22.0'),
 });
 export type Config = z.infer<typeof schema>;
 
@@ -26,8 +28,13 @@ export class ConfigService implements OnModuleInit {
     const parsed = schema.safeParse(process.env);
     if (!parsed.success) throw new Error(parsed.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join('; '));
     const wa = parsed.data;
-    const values = [wa.WHATSAPP_AGENCY_ID, wa.WHATSAPP_PHONE_NUMBER_ID, wa.WHATSAPP_VERIFY_TOKEN, wa.WHATSAPP_APP_SECRET];
-    if (values.some(Boolean) && !values.every(Boolean)) throw new Error('Configure all four WhatsApp variables together, or leave all four unset.');
+    const inboundConfigured = Boolean(wa.WHATSAPP_VERIFY_TOKEN || wa.WHATSAPP_APP_SECRET);
+    if (inboundConfigured && !(wa.WHATSAPP_AGENCY_ID && wa.WHATSAPP_PHONE_NUMBER_ID && wa.WHATSAPP_VERIFY_TOKEN && wa.WHATSAPP_APP_SECRET)) {
+      throw new Error('Inbound WhatsApp webhooks require WHATSAPP_AGENCY_ID, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_VERIFY_TOKEN and WHATSAPP_APP_SECRET.');
+    }
+    if (wa.WHATSAPP_ACCESS_TOKEN && !(wa.WHATSAPP_AGENCY_ID && wa.WHATSAPP_PHONE_NUMBER_ID)) {
+      throw new Error('Outbound WhatsApp delivery requires WHATSAPP_AGENCY_ID and WHATSAPP_PHONE_NUMBER_ID.');
+    }
     this.value = wa;
   }
   get<K extends keyof Config>(key: K): Config[K] { return this.value[key]; }
