@@ -17,7 +17,7 @@ const schema = z.object({
   WHATSAPP_VERIFY_TOKEN: z.preprocess(value => value === '' ? undefined : value, z.string().min(32).optional()),
   WHATSAPP_APP_SECRET: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
   WHATSAPP_ACCESS_TOKEN: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
-  WHATSAPP_API_VERSION: z.string().regex(/^v\d+\.\d+$/).default('v22.0'),
+  WHATSAPP_API_VERSION: z.string().regex(/^v\d+\.\d+$/).default('v27.0'),
 });
 export type Config = z.infer<typeof schema>;
 
