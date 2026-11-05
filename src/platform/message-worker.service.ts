@@ -7,6 +7,8 @@ import { ConfigService } from '../config/config.service';
 interface MessageJob { id: string; agencyId: string; conversationId: string; body: string; subject?: string | null; attempts: number; }
 interface EmailDeliveryJob extends MessageJob { recipient: string; }
 interface WhatsAppDeliveryJob extends MessageJob { recipient: string; }
+interface InstagramDeliveryJob extends MessageJob { recipient: string; }
+interface TikTokDeliveryJob extends MessageJob { recipient: string; }
 
 @Injectable()
 export class MessageWorker implements OnModuleInit, OnModuleDestroy {
@@ -29,6 +31,12 @@ export class MessageWorker implements OnModuleInit, OnModuleDestroy {
       }
       if (this.config.get('EMAIL_RESEND_API_KEY') && this.config.get('EMAIL_FROM_ADDRESS') && this.config.get('EMAIL_AGENCY_ID')) {
         for (let i = 0; i < 5; i++) { const job = await this.claimEmailDelivery(); if (!job) break; await this.deliverEmail(job); }
+      }
+      if (this.config.get('INSTAGRAM_ACCESS_TOKEN') && this.config.get('INSTAGRAM_ACCOUNT_ID') && this.config.get('INSTAGRAM_AGENCY_ID')) {
+        for (let i=0;i<5;i++){const job=await this.claimInstagramDelivery();if(!job)break;await this.deliverInstagram(job);}
+      }
+      if (this.config.get('TIKTOK_ACCESS_TOKEN') && this.config.get('TIKTOK_BUSINESS_ID') && this.config.get('TIKTOK_AGENCY_ID')) {
+        for (let i=0;i<5;i++){const job=await this.claimTikTokDelivery();if(!job)break;await this.deliverTikTok(job);}
       }
       if (this.config.get('WHATSAPP_ACCESS_TOKEN') && this.config.get('WHATSAPP_PHONE_NUMBER_ID') && this.config.get('WHATSAPP_AGENCY_ID')) {
         for (let i = 0; i < 5; i++) {
@@ -113,6 +121,51 @@ export class MessageWorker implements OnModuleInit, OnModuleDestroy {
     const delaySeconds = Math.min(1800, 30 * (2 ** Math.max(0, job.attempts - 1)));
     await this.db.query("UPDATE messages SET delivery_status=$2,delivery_started_at=NULL,delivery_next_attempt_at=CASE WHEN $2='queued' THEN now()+($3*interval '1 second') ELSE NULL END,delivery_error=$4 WHERE id=$1 AND delivery_status='sending'", [job.id, terminal ? 'failed' : 'queued', delaySeconds, reason.slice(0, 1000)]);
     if (terminal) this.logger.warn('Email delivery permanently failed for message ' + job.id + ': ' + reason);
+  }
+
+
+  private async claimInstagramDelivery():Promise<InstagramDeliveryJob|null>{
+    return this.claimSocialDelivery<InstagramDeliveryJob>('instagram',this.config.get('INSTAGRAM_AGENCY_ID'));
+  }
+  private async claimTikTokDelivery():Promise<TikTokDeliveryJob|null>{
+    return this.claimSocialDelivery<TikTokDeliveryJob>('tiktok',this.config.get('TIKTOK_AGENCY_ID'));
+  }
+  private async claimSocialDelivery<T extends MessageJob>(channel:string,agencyId:string|undefined):Promise<T|null>{
+    if(!agencyId)return null;
+    return this.db.transaction(async client=>{
+      await client.query("UPDATE messages SET delivery_status='failed',delivery_started_at=NULL,delivery_error='Social delivery lease expired after final attempt' WHERE direction='outbound' AND delivery_status='sending' AND delivery_started_at < now()-interval '5 minutes' AND delivery_attempts>=5 AND agency_id=$1",[agencyId]);
+      const result=await client.query<T>("SELECT m.id,m.agency_id AS \"agencyId\",m.conversation_id AS \"conversationId\",m.body,cv.customer_contact AS recipient,m.delivery_attempts AS attempts FROM messages m JOIN conversations cv ON cv.id=m.conversation_id AND cv.agency_id=m.agency_id WHERE m.direction='outbound' AND cv.agency_id=$1 AND cv.channel=$2 AND cv.customer_contact IS NOT NULL AND m.delivery_attempts<5 AND ((m.delivery_status='queued' AND (m.delivery_next_attempt_at IS NULL OR m.delivery_next_attempt_at<=now())) OR (m.delivery_status='sending' AND m.delivery_started_at < now()-interval '5 minutes')) ORDER BY m.created_at LIMIT 1 FOR UPDATE OF m SKIP LOCKED",[agencyId,channel]);
+      const job=result.rows[0];if(!job)return null;const attempts=Number(job.attempts)+1;
+      await client.query("UPDATE messages SET delivery_status='sending',delivery_started_at=now(),delivery_attempts=$2,delivery_error=NULL WHERE id=$1",[job.id,attempts]);
+      return {...job,attempts};
+    });
+  }
+  private async deliverInstagram(job:InstagramDeliveryJob):Promise<void>{
+    const token=this.config.get('INSTAGRAM_ACCESS_TOKEN');const account=this.config.get('INSTAGRAM_ACCOUNT_ID');const version=this.config.get('INSTAGRAM_API_VERSION');
+    if(!token||!account)return;if(job.body.length>1000){await this.failSocialDelivery(job,'Instagram text reply exceeds 1,000 characters.',true);return;}
+    try{
+      const response=await fetch('https://graph.instagram.com/'+version+'/'+account+'/messages',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({recipient:{id:job.recipient},message:{text:job.body}}),signal:AbortSignal.timeout(15000)});
+      const data=await response.json().catch(()=>({})) as {message_id?:string;id?:string;error?:{message?:string}};
+      const id=data.message_id||data.id;
+      if(!response.ok||!id){await this.failSocialDelivery(job,data.error?.message||'Instagram Graph API HTTP '+response.status,response.status>=400&&response.status<500&&response.status!==429);return;}
+      await this.db.query("UPDATE messages SET delivery_status='sent',provider_message_id=$2,delivery_started_at=NULL,delivery_next_attempt_at=NULL,delivery_error=NULL WHERE id=$1 AND delivery_status='sending'",[job.id,id]);
+    }catch(error){await this.failSocialDelivery(job,error instanceof Error?error.message:'Unknown Instagram delivery error',false);}
+  }
+  private async deliverTikTok(job:TikTokDeliveryJob):Promise<void>{
+    const token=this.config.get('TIKTOK_ACCESS_TOKEN');const business=this.config.get('TIKTOK_BUSINESS_ID');
+    if(!token||!business)return;if(job.body.length>6000){await this.failSocialDelivery(job,'TikTok text reply exceeds 6,000 characters.',true);return;}
+    try{
+      const response=await fetch('https://business-api.tiktok.com/open_api/v1.3/business/message/send/',{method:'POST',headers:{'Access-Token':token,'Content-Type':'application/json'},body:JSON.stringify({business_id:business,recipient_type:'CONVERSATION',recipient:job.recipient,message_type:'TEXT',text:{body:job.body}}),signal:AbortSignal.timeout(15000)});
+      const data=await response.json().catch(()=>({})) as {code?:number;message?:string;data?:{message_id?:string}};
+      const id=data.data?.message_id;
+      if(!response.ok||data.code!==0||!id){const permanent=response.status>=400&&response.status<500&&response.status!==429||[40001,40002,40007,40064,40105].includes(Number(data.code));await this.failSocialDelivery(job,data.message||'TikTok Business Messaging API HTTP '+response.status+' code '+data.code,permanent);return;}
+      await this.db.query("UPDATE messages SET delivery_status='sent',provider_message_id=$2,delivery_started_at=NULL,delivery_next_attempt_at=NULL,delivery_error=NULL WHERE id=$1 AND delivery_status='sending'",[job.id,id]);
+    }catch(error){await this.failSocialDelivery(job,error instanceof Error?error.message:'Unknown TikTok delivery error',false);}
+  }
+  private async failSocialDelivery(job:MessageJob,reason:string,permanent:boolean):Promise<void>{
+    const terminal=permanent||job.attempts>=5;const delay=Math.min(1800,30*(2**Math.max(0,job.attempts-1)));
+    await this.db.query("UPDATE messages SET delivery_status=$2,delivery_started_at=NULL,delivery_next_attempt_at=CASE WHEN $2='queued' THEN now()+($3*interval '1 second') ELSE NULL END,delivery_error=$4 WHERE id=$1 AND delivery_status='sending'",[job.id,terminal?'failed':'queued',delay,reason.slice(0,1000)]);
+    if(terminal)this.logger.warn('Social message permanently failed for '+job.id+': '+reason);
   }
 
   private async claimWhatsAppDelivery(): Promise<WhatsAppDeliveryJob | null> {

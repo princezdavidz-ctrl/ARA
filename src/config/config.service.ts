@@ -21,6 +21,16 @@ const schema = z.object({
   EMAIL_RESEND_API_KEY: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
   EMAIL_FROM_ADDRESS: z.preprocess(value => value === '' ? undefined : value, z.string().email().optional()),
   EMAIL_WEBHOOK_SECRET: z.preprocess(value => value === '' ? undefined : value, z.string().min(32).optional()),
+  INSTAGRAM_AGENCY_ID: z.preprocess(value => value === '' ? undefined : value, z.string().uuid().optional()),
+  INSTAGRAM_ACCOUNT_ID: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
+  INSTAGRAM_ACCESS_TOKEN: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
+  INSTAGRAM_APP_SECRET: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
+  INSTAGRAM_VERIFY_TOKEN: z.preprocess(value => value === '' ? undefined : value, z.string().min(32).optional()),
+  INSTAGRAM_API_VERSION: z.string().regex(/^v\d+\.\d+$/).default('v26.0'),
+  TIKTOK_AGENCY_ID: z.preprocess(value => value === '' ? undefined : value, z.string().uuid().optional()),
+  TIKTOK_BUSINESS_ID: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
+  TIKTOK_ACCESS_TOKEN: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
+  TIKTOK_WEBHOOK_SECRET: z.preprocess(value => value === '' ? undefined : value, z.string().min(32).optional()),
   WHATSAPP_API_VERSION: z.string().regex(/^v\d+\.\d+$/).default('v27.0'),
 });
 export type Config = z.infer<typeof schema>;
@@ -42,6 +52,14 @@ export class ConfigService implements OnModuleInit {
     const emailAny = Boolean(wa.EMAIL_AGENCY_ID || wa.EMAIL_RESEND_API_KEY || wa.EMAIL_FROM_ADDRESS || wa.EMAIL_WEBHOOK_SECRET);
     if (emailAny && !(wa.EMAIL_AGENCY_ID && wa.EMAIL_RESEND_API_KEY && wa.EMAIL_FROM_ADDRESS && wa.EMAIL_WEBHOOK_SECRET)) {
       throw new Error('Email channel requires EMAIL_AGENCY_ID, EMAIL_RESEND_API_KEY, EMAIL_FROM_ADDRESS and EMAIL_WEBHOOK_SECRET together.');
+    }
+    const igAny = Boolean(wa.INSTAGRAM_AGENCY_ID || wa.INSTAGRAM_ACCOUNT_ID || wa.INSTAGRAM_ACCESS_TOKEN || wa.INSTAGRAM_APP_SECRET || wa.INSTAGRAM_VERIFY_TOKEN);
+    if (igAny && !(wa.INSTAGRAM_AGENCY_ID && wa.INSTAGRAM_ACCOUNT_ID && wa.INSTAGRAM_ACCESS_TOKEN && wa.INSTAGRAM_APP_SECRET && wa.INSTAGRAM_VERIFY_TOKEN)) {
+      throw new Error('Instagram requires INSTAGRAM_AGENCY_ID, INSTAGRAM_ACCOUNT_ID, INSTAGRAM_ACCESS_TOKEN, INSTAGRAM_APP_SECRET and INSTAGRAM_VERIFY_TOKEN together.');
+    }
+    const ttAny = Boolean(wa.TIKTOK_AGENCY_ID || wa.TIKTOK_BUSINESS_ID || wa.TIKTOK_ACCESS_TOKEN || wa.TIKTOK_WEBHOOK_SECRET);
+    if (ttAny && !(wa.TIKTOK_AGENCY_ID && wa.TIKTOK_BUSINESS_ID && wa.TIKTOK_ACCESS_TOKEN && wa.TIKTOK_WEBHOOK_SECRET)) {
+      throw new Error('TikTok requires TIKTOK_AGENCY_ID, TIKTOK_BUSINESS_ID, TIKTOK_ACCESS_TOKEN and TIKTOK_WEBHOOK_SECRET together.');
     }
     this.value = wa;
   }

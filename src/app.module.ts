@@ -17,9 +17,13 @@ import { PropertyService } from './platform/property.service';
 import { DashboardController } from './platform/dashboard.controller';
 import { EmailWebhookController } from './platform/email-webhook.controller';
 import { EmailWebhookService } from './platform/email-webhook.service';
+import { InstagramWebhookController } from './platform/instagram-webhook.controller';
+import { InstagramWebhookService } from './platform/instagram-webhook.service';
+import { TikTokWebhookController } from './platform/tiktok-webhook.controller';
+import { TikTokWebhookService } from './platform/tiktok-webhook.service';
 @Module({
   imports: [PlatformModule],
-  controllers: [HealthController, KnowledgeController, AnswerController, WhatsAppWebhookController, EmailWebhookController, PropertyController, DashboardController],
-  providers: [ConfigService, DatabaseService, OpenAiService, IngestionService, RetrievalService, AnswerService, MessageWorker, WhatsAppWebhookService, EmailWebhookService, PropertyService],
+  controllers: [HealthController, KnowledgeController, AnswerController, WhatsAppWebhookController, EmailWebhookController, InstagramWebhookController, TikTokWebhookController, PropertyController, DashboardController],
+  providers: [ConfigService, DatabaseService, OpenAiService, IngestionService, RetrievalService, AnswerService, MessageWorker, WhatsAppWebhookService, EmailWebhookService, InstagramWebhookService, TikTokWebhookService, PropertyService],
 })
 export class AppModule {}
