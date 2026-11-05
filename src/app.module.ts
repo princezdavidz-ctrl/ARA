@@ -15,9 +15,11 @@ import { WhatsAppWebhookService } from './platform/whatsapp-webhook.service';
 import { PropertyController } from './platform/property.controller';
 import { PropertyService } from './platform/property.service';
 import { DashboardController } from './platform/dashboard.controller';
+import { EmailWebhookController } from './platform/email-webhook.controller';
+import { EmailWebhookService } from './platform/email-webhook.service';
 @Module({
   imports: [PlatformModule],
-  controllers: [HealthController, KnowledgeController, AnswerController, WhatsAppWebhookController, PropertyController, DashboardController],
-  providers: [ConfigService, DatabaseService, OpenAiService, IngestionService, RetrievalService, AnswerService, MessageWorker, WhatsAppWebhookService, PropertyService],
+  controllers: [HealthController, KnowledgeController, AnswerController, WhatsAppWebhookController, EmailWebhookController, PropertyController, DashboardController],
+  providers: [ConfigService, DatabaseService, OpenAiService, IngestionService, RetrievalService, AnswerService, MessageWorker, WhatsAppWebhookService, EmailWebhookService, PropertyService],
 })
 export class AppModule {}

@@ -5,7 +5,7 @@ NestJS + TypeScript backend for a Kenyan real-estate agency. Includes tenant-sco
 ## Setup
 1. Copy .env.example to .env; set OpenAI key, 32+ character ingestion key and JWT secret.
 2. Start PostgreSQL with docker compose up -d db.
-3. Apply SQL migrations 001_init.sql through 008_whatsapp_outbound_delivery.sql in order.
+3. Apply SQL migrations 001_init.sql through 009_email_channel.sql in order.
 4. Run npm ci, npm run build, npm test, then npm run start:dev.
 
 ## Property and lead management
@@ -23,3 +23,10 @@ Inbound webhook setup remains separate and requires WHATSAPP_AGENCY_ID, WHATSAPP
 
 ## Production status
 The worker runs inside the API process; use one worker-enabled instance or add a dedicated worker lease before horizontal scaling. Apply migrations and run build, unit, integration and security tests before production. Use HTTPS, rate limiting, secrets management, backups and monitoring.
+
+## Email channel
+ARA supports email conversations using Resend for outbound delivery and a signed inbound relay endpoint. Configure EMAIL_AGENCY_ID, EMAIL_RESEND_API_KEY, EMAIL_FROM_ADDRESS and EMAIL_WEBHOOK_SECRET together; leave all four blank to keep email disabled. The sender address must be verified with Resend.
+
+Inbound email relays POST JSON to /webhooks/email with headers X-ARA-Email-Timestamp (Unix seconds) and X-ARA-Email-Signature (sha256=HMAC-SHA256(secret, timestamp + "." + raw request body)). Timestamps must be within five minutes. The JSON contract is { "from": { "email": "customer@example.com", "name": "Customer" }, "subject": "Property enquiry", "text": "Message body", "messageId": "unique-provider-message-id" }. The relay must verify the upstream provider's webhook and then sign the normalized body using this ARA signature. Inbound IDs are deduplicated and tenant-scoped. ARA generates a grounded response using the same RAG worker and sends it as an email reply; human replies can be queued through the existing conversation message API, optionally with a subject.
+
+Email retries use the same maximum-five-attempt exponential backoff and provider idempotency key. ARA marks an email sent only after Resend accepts it and returns an ID; this is not proof of inbox delivery. Provider-specific inbound relay setup and delivery/read receipts are separate integration work.
