@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard, AraUser } from './auth.guard';
 import { PropertyService } from './property.service';
 import { propertyCreateSchema, propertyQuerySchema, propertyUpdateSchema } from './property.contracts';
@@ -26,7 +26,7 @@ export class PropertyController {
   @Post(':id/status')
   status(@Req() req:{user:AraUser},@Param('id') id:string,@Body() body:{status?:string}) {
     const status=body?.status;
-    if(!['available','reserved','let','sold','inactive'].includes(String(status))) throw new Error('Invalid property status');
+    if(!['available','reserved','let','sold','inactive'].includes(String(status))) throw new BadRequestException('Invalid property status');
     return this.properties.setStatus(req.user.agencyId,id,status as 'available'|'reserved'|'let'|'sold'|'inactive');
   }
 }

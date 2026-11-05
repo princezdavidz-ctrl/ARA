@@ -5,8 +5,11 @@ NestJS + TypeScript backend for a Kenyan real-estate agency. Includes tenant-sco
 ## Setup
 1. Copy `.env.example` to `.env`; set OpenAI key, 32+ character ingestion key and JWT secret.
 2. Start PostgreSQL: `docker compose up -d db`.
-3. Apply SQL migrations in order: `001_init.sql`, `002_platform.sql`, `003_tenant_rag.sql`, `004_message_worker.sql`, `005_worker_recovery.sql`.
+3. Apply SQL migrations in order: `001_init.sql`, `002_platform.sql`, `003_tenant_rag.sql`, `004_message_worker.sql`, `005_worker_recovery.sql`, `006_properties.sql`.
 4. Run `npm ci`, `npm run build`, `npm test`, then `npm run start:dev`.
+
+## Property management
+Authenticated agency users can manage structured property records through `GET /platform/properties`, `POST /platform/properties`, `PATCH /platform/properties/:id`, and `POST /platform/properties/:id/status`. Property records are tenant-scoped and indexed into the agency's RAG knowledge base. Supported statuses: `available`, `reserved`, `let`, `sold`, `inactive`. Listing availability and pricing must be kept current by agency staff.
 
 ## Key API
 - `POST /platform/register`: create agency owner; returns generated agency slug.

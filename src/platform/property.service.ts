@@ -46,7 +46,7 @@ export class PropertyService {
          ON CONFLICT(agency_id,source_ref) DO UPDATE SET title=EXCLUDED.title,description=EXCLUDED.description,
           purpose=EXCLUDED.purpose,property_type=EXCLUDED.property_type,county=EXCLUDED.county,town=EXCLUDED.town,
           area=EXCLUDED.area,price=EXCLUDED.price,bedrooms=EXCLUDED.bedrooms,bathrooms=EXCLUDED.bathrooms,
-          size_sqm=EXCLUDED.size_sqm,language=EXCLUDED.language,status='available',updated_at=now()
+          size_sqm=EXCLUDED.size_sqm,language=EXCLUDED.language,updated_at=now()
          RETURNING id,source_ref AS "sourceRef",title,purpose,property_type AS "propertyType",county,town,area,
           price::text AS price,currency,bedrooms,bathrooms,size_sqm::text AS "sizeSqm",language,status`,
         [agencyId,input.sourceRef,input.title,input.description,input.purpose,input.propertyType,input.county,
