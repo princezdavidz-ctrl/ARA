@@ -1,6 +1,6 @@
 {
-  "name": "ara-phase1-rag",
-  "version": "1.0.0",
+  "name": "ara-autonomous-respond-agent",
+  "version": "2.0.0",
   "private": true,
   "scripts": {
     "build": "nest build",
@@ -33,7 +33,5 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.7.2"
   },
-  "engines": {
-    "node": ">=20"
-  }
+  "engines": { "node": ">=20" }
 }

@@ -8,5 +8,10 @@ import { AnswerController } from './http/answer.controller';
 import { IngestionService } from './rag/ingestion.service';
 import { RetrievalService } from './rag/retrieval.service';
 import { AnswerService } from './rag/answer.service';
-@Module({ controllers:[HealthController,KnowledgeController,AnswerController], providers:[ConfigService,DatabaseService,OpenAiService,IngestionService,RetrievalService,AnswerService] })
+import { PlatformModule } from './platform/platform.module';
+@Module({
+  imports: [PlatformModule],
+  controllers: [HealthController, KnowledgeController, AnswerController],
+  providers: [ConfigService, DatabaseService, OpenAiService, IngestionService, RetrievalService, AnswerService],
+})
 export class AppModule {}
