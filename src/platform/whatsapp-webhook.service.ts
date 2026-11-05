@@ -1,0 +1,97 @@
+import { Injectable, Logger, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import { createHmac, timingSafeEqual } from 'node:crypto';
+import { DatabaseService } from '../database/database.service';
+import { ConfigService } from '../config/config.service';
+
+@Injectable()
+export class WhatsAppWebhookService {
+  private readonly logger = new Logger(WhatsAppWebhookService.name);
+
+  constructor(private readonly db: DatabaseService, private readonly config: ConfigService) {}
+
+  verifySubscription(mode: string, token: string, challenge: string): string {
+    const expected = this.config.get('WHATSAPP_VERIFY_TOKEN');
+    if (!expected) throw new ServiceUnavailableException('WhatsApp channel is not configured');
+    const a = Buffer.from(token || '');
+    const b = Buffer.from(expected);
+    if (mode !== 'subscribe' || a.length !== b.length || !timingSafeEqual(a, b) || !challenge) {
+      throw new UnauthorizedException('WhatsApp webhook verification failed');
+    }
+    return challenge;
+  }
+
+  async receive(rawBody: Buffer | undefined, signature: string | undefined, payload: any): Promise<{ received: boolean; accepted: number }> {
+    const appSecret = this.config.get('WHATSAPP_APP_SECRET');
+    const agencyId = this.config.get('WHATSAPP_AGENCY_ID');
+    const phoneNumberId = this.config.get('WHATSAPP_PHONE_NUMBER_ID');
+    if (!appSecret || !agencyId || !phoneNumberId) {
+      throw new ServiceUnavailableException('WhatsApp channel is not configured');
+    }
+    if (!rawBody || !signature || !/^sha256=[a-f0-9]{64}$/i.test(signature)) {
+      throw new UnauthorizedException('Missing or invalid webhook signature');
+    }
+    const expected = createHmac('sha256', appSecret).update(rawBody).digest();
+    const supplied = Buffer.from(signature.slice(7), 'hex');
+    if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) {
+      throw new UnauthorizedException('Invalid WhatsApp webhook signature');
+    }
+
+    if (payload?.object !== 'whatsapp_business_account' || !Array.isArray(payload.entry)) {
+      return { received: true, accepted: 0 };
+    }
+
+    let accepted = 0;
+    for (const entry of payload.entry) {
+      for (const change of entry?.changes || []) {
+        const value = change?.value;
+        if (change?.field !== 'messages' || value?.metadata?.phone_number_id !== phoneNumberId) continue;
+        const contacts = new Map<string, string>();
+        for (const contact of value.contacts || []) {
+          if (contact.wa_id) contacts.set(String(contact.wa_id), String(contact.profile?.name || ''));
+        }
+        for (const message of value.messages || []) {
+          const from = String(message?.from || '');
+          const messageId = String(message?.id || '');
+          if (!from || !messageId) continue;
+          const type = String(message?.type || 'unknown');
+          const body = type === 'text'
+            ? String(message?.text?.body || '').trim()
+            : `[Customer sent a WhatsApp ${type} message. Human review is required to inspect this content.]`;
+          if (!body) continue;
+
+          const inserted = await this.db.transaction(async client => {
+            const found = await client.query(
+              `SELECT id FROM conversations
+               WHERE agency_id = $1 AND channel = 'whatsapp' AND customer_contact = $2 AND status <> 'closed'
+               ORDER BY updated_at DESC LIMIT 1 FOR UPDATE`,
+              [agencyId, from],
+            );
+            let conversationId = found.rows[0]?.id;
+            if (!conversationId) {
+              const created = await client.query(
+                `INSERT INTO conversations(agency_id, channel, customer_name, customer_contact)
+                 VALUES($1, 'whatsapp', $2, $3) RETURNING id`,
+                [agencyId, contacts.get(from) || null, from],
+              );
+              conversationId = created.rows[0].id;
+            }
+            const result = await client.query(
+              `INSERT INTO messages(agency_id, conversation_id, direction, sender_type, body,
+                  idempotency_key, delivery_status, processing_status)
+               VALUES($1, $2, 'inbound', 'customer', $3, $4, 'stored', 'pending')
+               ON CONFLICT(agency_id, idempotency_key) DO NOTHING
+               RETURNING id`,
+              [agencyId, conversationId, body, 'whatsapp:' + messageId],
+            );
+            if (result.rowCount) {
+              await client.query('UPDATE conversations SET updated_at = now() WHERE id = $1 AND agency_id = $2', [conversationId, agencyId]);
+            }
+            return Boolean(result.rowCount);
+          });
+          if (inserted) accepted++;
+        }
+      }
+    }
+    return { received: true, accepted };
+  }
+}
