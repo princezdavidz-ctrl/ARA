@@ -1,23 +1,18 @@
 {
-  "name": "ara-real-estate-rag",
+  "name": "ara-phase1-rag",
   "version": "1.0.0",
   "private": true,
-  "description": "Bilingual English/Kiswahili RAG engine for a Kenyan real estate agency",
   "scripts": {
     "build": "nest build",
     "start": "node dist/main.js",
     "start:dev": "nest start --watch",
-    "start:prod": "node dist/main.js",
-    "typecheck": "tsc --noEmit",
-    "test": "jest --runInBand",
-    "db:migrate": "psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f migrations/001_init.sql"
+    "test": "jest --runInBand"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.15",
     "@nestjs/core": "^10.4.15",
     "@nestjs/platform-express": "^10.4.15",
-    "class-transformer": "^0.5.1",
-    "class-validator": "^0.14.1",
+    "@nestjs/config": "^3.3.0",
     "helmet": "^8.0.0",
     "openai": "^4.77.0",
     "pg": "^8.13.1",
@@ -38,5 +33,7 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.7.2"
   },
-  "engines": { "node": ">=20.11" }
+  "engines": {
+    "node": ">=20"
+  }
 }

@@ -1,20 +1,16 @@
 services:
-  postgres:
+  db:
     image: pgvector/pgvector:pg16
-    restart: unless-stopped
     environment:
       POSTGRES_USER: ara
-      POSTGRES_PASSWORD: change-this-password
-      POSTGRES_DB: ara_rag
-    ports:
-      - "5432:5432"
-    volumes:
-      - ara_pgdata:/var/lib/postgresql/data
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_DB: ara
+    ports: ["5432:5432"]
+    volumes: ["ara_pg:/var/lib/postgresql/data", "./migrations:/docker-entrypoint-initdb.d:ro"]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ara -d ara_rag"]
+      test: ["CMD-SHELL", "pg_isready -U ara -d ara"]
       interval: 5s
-      timeout: 5s
-      retries: 10
-
+      timeout: 3s
+      retries: 20
 volumes:
-  ara_pgdata:
+  ara_pg:

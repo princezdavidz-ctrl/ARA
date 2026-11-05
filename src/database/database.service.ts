@@ -1,0 +1,4 @@
+import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Pool,PoolClient,QueryResult,QueryResultRow } from 'pg';
+import { ConfigService } from '../config/config.service';
+@Injectable() export class DatabaseService implements OnModuleInit,OnModuleDestroy {private pool!:Pool;constructor(private config:ConfigService){} async onModuleInit(){this.pool=new Pool({connectionString:this.config.get('DATABASE_URL'),max:12,connectionTimeoutMillis:5000});await this.pool.query('SELECT 1');} async onModuleDestroy(){await this.pool?.end();} query<T extends QueryResultRow=QueryResultRow>(sql:string,args:unknown[]=[]):Promise<QueryResult<T>>{return this.pool.query<T>(sql,args);} async transaction<T>(fn:(c:PoolClient)=>Promise<T>):Promise<T>{const c=await this.pool.connect();try{await c.query('BEGIN');const v=await fn(c);await c.query('COMMIT');return v;}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}}}

@@ -1,0 +1,1 @@
+import { Body,Controller,Post } from '@nestjs/common';import { AnswerService } from '../rag/answer.service';import { answerSchema } from '../rag/contracts';@Controller('answer') export class AnswerController{constructor(private answers:AnswerService){}@Post()answer(@Body()body:unknown){return this.answers.answer(answerSchema.parse(body));}}

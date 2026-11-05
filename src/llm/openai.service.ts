@@ -1,0 +1,4 @@
+import { Injectable, OnModuleInit } from '@nestjs/common';
+import OpenAI from 'openai';
+import { ConfigService } from '../config/config.service';
+@Injectable() export class OpenAiService implements OnModuleInit {private client!:OpenAI;constructor(private config:ConfigService){} onModuleInit(){this.client=new OpenAI({apiKey:this.config.get('OPENAI_API_KEY')});} async embed(texts:string[]):Promise<number[][]>{const r=await this.client.embeddings.create({model:'text-embedding-3-small',input:texts});return r.data.sort((a,b)=>a.index-b.index).map(x=>x.embedding);} async generate(system:string,user:string):Promise<string>{const r=await this.client.chat.completions.create({model:this.config.get('OPENAI_CHAT_MODEL'),temperature:0,response_format:{type:'json_object'},messages:[{role:'system',content:system},{role:'user',content:user}]});return r.choices[0]?.message.content??'{}';}}
