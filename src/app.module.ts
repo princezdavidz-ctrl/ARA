@@ -9,9 +9,10 @@ import { IngestionService } from './rag/ingestion.service';
 import { RetrievalService } from './rag/retrieval.service';
 import { AnswerService } from './rag/answer.service';
 import { PlatformModule } from './platform/platform.module';
+import { MessageWorker } from './platform/message-worker.service';
 @Module({
   imports: [PlatformModule],
   controllers: [HealthController, KnowledgeController, AnswerController],
-  providers: [ConfigService, DatabaseService, OpenAiService, IngestionService, RetrievalService, AnswerService],
+  providers: [ConfigService, DatabaseService, OpenAiService, IngestionService, RetrievalService, AnswerService, MessageWorker],
 })
 export class AppModule {}
