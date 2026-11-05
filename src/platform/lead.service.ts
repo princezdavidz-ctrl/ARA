@@ -54,7 +54,8 @@ export class LeadService {
     const parsed = leadCreateSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException(parsed.error.flatten());
     const v = parsed.data;
-    this.assertAssignmentPermission(u, v.assignedUserId);
+    if (v.assignedUserId) this.assertAssignmentPermission(u);
+    if (v.assignedUserId) await this.ensureActiveAssignee(u.agencyId,v.assignedUserId);
     const result = await this.db.query(
       `INSERT INTO leads(agency_id,contact_name,email,phone,source,interested_purpose,property_id,conversation_id,
         county,town,budget_min,budget_max,assigned_user_id,follow_up_at,created_by)
@@ -73,7 +74,10 @@ export class LeadService {
     const parsed = leadUpdateSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException(parsed.error.flatten());
     const v = parsed.data;
-    if (Object.prototype.hasOwnProperty.call(v,'assignedUserId')) this.assertAssignmentPermission(u,v.assignedUserId);
+    if (Object.prototype.hasOwnProperty.call(v,'assignedUserId')) {
+      this.assertAssignmentPermission(u);
+      if (v.assignedUserId) await this.ensureActiveAssignee(u.agencyId,v.assignedUserId);
+    }
     const current = await this.db.query('SELECT * FROM leads WHERE id=$1 AND agency_id=$2',[id,u.agencyId]);
     if (!current.rowCount) throw new NotFoundException('Lead not found');
     const r = current.rows[0];
@@ -130,7 +134,12 @@ export class LeadService {
     return r.rows[0];
   }
 
-  private assertAssignmentPermission(u:AraUser, assignedUserId?:string|null) {
-    if (assignedUserId && !['owner','admin','manager'].includes(u.role)) throw new ForbiddenException('Only managers can assign leads');
+  private assertAssignmentPermission(u:AraUser) {
+    if (!['owner','admin','manager'].includes(u.role)) throw new ForbiddenException('Only owners, admins and managers can assign leads');
+  }
+
+  private async ensureActiveAssignee(agencyId:string,userId:string) {
+    const r=await this.db.query('SELECT id FROM agency_users WHERE id=$1 AND agency_id=$2 AND is_active=true',[userId,agencyId]);
+    if (!r.rowCount) throw new BadRequestException('Assigned user must be an active member of this agency');
   }
 }

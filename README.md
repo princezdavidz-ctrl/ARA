@@ -5,7 +5,7 @@ NestJS + TypeScript backend for a Kenyan real-estate agency. Includes tenant-sco
 ## Setup
 1. Copy `.env.example` to `.env`; set OpenAI key, 32+ character ingestion key and JWT secret.
 2. Start PostgreSQL: `docker compose up -d db`.
-3. Apply SQL migrations in order: `001_init.sql`, `002_platform.sql`, `003_tenant_rag.sql`, `004_message_worker.sql`, `005_worker_recovery.sql`, `006_properties.sql`.
+3. Apply SQL migrations in order: `001_init.sql`, `002_platform.sql`, `003_tenant_rag.sql`, `004_message_worker.sql`, `005_worker_recovery.sql`, `006_properties.sql`, `007_leads.sql`.
 4. Run `npm ci`, `npm run build`, `npm test`, then `npm run start:dev`.
 
 ## Property management
