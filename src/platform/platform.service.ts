@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException, OnApplicationBootstrap } from '@nestjs/common';
 import { createHash, createHmac, randomBytes, timingSafeEqual, scrypt as scryptCb } from 'node:crypto';
 import { promisify } from 'node:util';
 import { DatabaseService } from '../database/database.service';
@@ -6,8 +6,21 @@ import { ConfigService } from '../config/config.service';
 const scrypt = promisify(scryptCb);
 type User = { id:string; agencyId:string; email:string; fullName:string; role:string };
 @Injectable()
-export class PlatformService {
+export class PlatformService implements OnApplicationBootstrap {
   constructor(private db:DatabaseService, private config:ConfigService) {}
+  async onApplicationBootstrap() {
+    const password = process.env.ARA_BOOTSTRAP_OWNER_PASSWORD;
+    if (!password) return;
+    const email = String(process.env.ARA_BOOTSTRAP_OWNER_EMAIL || '').trim().toLowerCase();
+    const agencyName = String(process.env.ARA_BOOTSTRAP_AGENCY_NAME || '').trim();
+    const fullName = String(process.env.ARA_BOOTSTRAP_OWNER_FULL_NAME || '').trim();
+    if (!email || !agencyName || !fullName) throw new Error('ARA owner bootstrap requires ARA_BOOTSTRAP_OWNER_EMAIL, ARA_BOOTSTRAP_AGENCY_NAME and ARA_BOOTSTRAP_OWNER_FULL_NAME.');
+    const existing = await this.db.query('SELECT id FROM agency_users WHERE lower(email)=$1 LIMIT 1', [email]);
+    if (!existing.rowCount) {
+      await this.register({ agencyName, fullName, email, password });
+    }
+    delete process.env.ARA_BOOTSTRAP_OWNER_PASSWORD;
+  }
   private slug(s:string){return s.toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,48);}
   private async hashPassword(password:string){const salt=randomBytes(16);const key=await scrypt(password,salt,64) as Buffer;return 'scrypt$'+salt.toString('hex')+'$'+key.toString('hex');}
   private async verifyPassword(password:string,stored:string){const [kind,saltHex,keyHex]=stored.split('$');if(kind!=='scrypt'||!saltHex||!keyHex)return false;const key=await scrypt(password,Buffer.from(saltHex,'hex'),64) as Buffer;const expected=Buffer.from(keyHex,'hex');return key.length===expected.length&&timingSafeEqual(key,expected);}
