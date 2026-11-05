@@ -1,1 +1,10 @@
-import { Body,Controller,Headers,Post,UnauthorizedException } from '@nestjs/common';import { ConfigService } from '../config/config.service';import { IngestionService } from '../rag/ingestion.service';import { knowledgeSchema } from '../rag/contracts';@Controller('knowledge') export class KnowledgeController{constructor(private ingest:IngestionService,private config:ConfigService){}@Post()async upsert(@Headers('x-ingestion-key')key:string,@Body()body:unknown){if(!key||key!==this.config.get('INGESTION_API_KEY'))throw new UnauthorizedException();const data=knowledgeSchema.parse(body);return this.ingest.upsert(data);}}
+import { Body,Controller,Post,Req,UseGuards } from '@nestjs/common';
+import { IngestionService } from '../rag/ingestion.service';
+import { knowledgeSchema } from '../rag/contracts';
+import { AuthGuard,AraUser } from '../platform/auth.guard';
+@Controller('knowledge')
+@UseGuards(AuthGuard)
+export class KnowledgeController {
+  constructor(private ingest:IngestionService){}
+  @Post() async upsert(@Req() req:{user:AraUser},@Body() body:unknown){return this.ingest.upsert(knowledgeSchema.parse(body),req.user.agencyId);}
+}
