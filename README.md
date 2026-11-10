@@ -1,14 +1,14 @@
 # ARA — Autonomous Respond Agent
 
-NestJS + TypeScript backend for a Kenyan real-estate agency. Includes tenant-scoped RAG, agency accounts, team access, conversations and a PostgreSQL-backed inbound AI worker.
+NestJS + TypeScript backend for ARA, a multi-company AI communication platform. The existing agency workspace is the tenant foundation; the platform expansion adds separate platform administration, company-specific AI configuration, channel connections, and hybrid subscription metering.
 
 ## Setup
 1. Copy .env.example to .env; set OpenAI key, 32+ character ingestion key and JWT secret.
 2. Start PostgreSQL with docker compose up -d db.
-3. Apply SQL migrations 001_init.sql through 010_social_channels.sql in order.
+3. Apply SQL migrations 001_init.sql through 011_multi_company_platform.sql in numeric order. Migration 011 is additive and creates the multi-company platform data foundation; it does not by itself activate the new admin APIs, DB-backed provider routing, payment processing, or separate frontend applications.
 4. Run npm ci, npm run build, npm test, then npm run start:dev.
 
-## Property and lead management
+## Platform architecture\nThe approved architecture and implementation sequence are documented in [docs/PLATFORM_ARCHITECTURE.md](docs/PLATFORM_ARCHITECTURE.md). ARA uses shared AI infrastructure with isolated company knowledge and configuration, supervised replies, hybrid subscription plus usage billing, and separate Super Admin and Company CRM applications.\n\n## Property and lead management
 Authenticated agency users can manage tenant-scoped property inventory and lead pipelines through the /platform/properties and /platform/leads endpoints. Property records are indexed into the agency RAG knowledge base. Listing availability and pricing must be kept current by agency staff.
 
 ## Agency dashboard
