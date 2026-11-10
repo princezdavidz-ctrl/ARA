@@ -28,9 +28,9 @@ export class ChannelCredentialVault {
       return value as Record<string,string>;
     } catch { throw new ServiceUnavailableException('Unable to decrypt channel credentials'); }
   }
-  async getForTenantConnection(agencyId:string,id:string):Promise<ResolvedChannel|null>{
+  async getForTenantConnection(agencyId:string,id:string,activeOnly=false):Promise<ResolvedChannel|null>{
     const r=await this.db.query<any>(`SELECT id,agency_id AS "agencyId",provider,external_account_id AS "externalAccountId",external_phone_number_id AS "externalPhoneNumberId",encrypted_credentials,credential_key_version AS "keyVersion",webhook_verified_at IS NOT NULL AS "webhookVerified"
-      FROM channel_connections WHERE agency_id=$1 AND id=$2 AND status IN ('pending','active','reauthorization_required') LIMIT 1`,[agencyId,id]);
+      FROM channel_connections WHERE agency_id=$1 AND id=$2 AND status IN ('pending','active','reauthorization_required') AND ($3::boolean=false OR status='active') LIMIT 1`,[agencyId,id,activeOnly]);
     const row=r.rows[0];if(!row)return null;
     return {id:row.id,agencyId:row.agencyId,provider:row.provider,externalAccountId:row.externalAccountId,externalPhoneNumberId:row.externalPhoneNumberId,credentials:this.decrypt(row.encrypted_credentials,row.keyVersion),keyVersion:row.keyVersion,webhookVerified:Boolean(row.webhookVerified)};
   }
