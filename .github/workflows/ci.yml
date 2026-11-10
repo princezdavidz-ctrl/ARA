@@ -29,8 +29,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-      - run: npm ci
+      - run: npm install --no-audit --no-fund
       - name: Apply database migrations
         run: for migration in migrations/*.sql; do echo "Applying $migration"; psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"; done
       - name: Build
