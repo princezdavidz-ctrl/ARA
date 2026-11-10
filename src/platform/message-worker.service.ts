@@ -176,6 +176,7 @@ export class MessageWorker implements OnModuleInit, OnModuleDestroy {
       const id=data.data?.message_id;
       if(!response.ok||data.code!==0||!id){const permanent=response.status>=400&&response.status<500&&response.status!==429||[40001,40002,40007,40064,40105].includes(Number(data.code));await this.failSocialDelivery(job,data.message||'TikTok Business Messaging API HTTP '+response.status+' code '+data.code,permanent);return;}
       await this.db.query("UPDATE messages SET delivery_status='sent',provider_message_id=$2,delivery_started_at=NULL,delivery_next_attempt_at=NULL,delivery_error=NULL WHERE id=$1 AND delivery_status='sending'",[job.id,id]);
+      await this.recordUsage(job.agencyId,'message_out','message-out:'+job.id);
     }catch(error){await this.failSocialDelivery(job,error instanceof Error?error.message:'Unknown TikTok delivery error',false);}
   }
   private async failSocialDelivery(job:MessageJob,reason:string,permanent:boolean):Promise<void>{
@@ -222,6 +223,7 @@ export class MessageWorker implements OnModuleInit, OnModuleDestroy {
         return;
       }
       await this.db.query("UPDATE messages SET delivery_status='sent',provider_message_id=$2,delivery_started_at=NULL,delivery_next_attempt_at=NULL,delivery_error=NULL WHERE id=$1 AND delivery_status='sending'", [job.id, providerMessageId]);
+      await this.recordUsage(job.agencyId,'message_out','message-out:'+job.id);
     } catch (error) {
       await this.failWhatsAppDelivery(job, error instanceof Error ? error.message : 'Unknown WhatsApp delivery error', false);
     }
