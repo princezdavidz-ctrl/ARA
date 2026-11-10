@@ -81,9 +81,10 @@ CREATE TABLE IF NOT EXISTS channel_connections (
  display_name text NOT NULL, external_account_id text NOT NULL, external_phone_number_id text,
  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','active','reauthorization_required','disabled','error')),
  encrypted_credentials bytea NOT NULL, credential_key_version text NOT NULL, webhook_secret_hash text,
- scopes text[] NOT NULL DEFAULT '{}', connected_by uuid REFERENCES agency_users(id) ON DELETE SET NULL,
+ scopes text[] NOT NULL DEFAULT '{}', connected_by uuid,
  last_verified_at timestamptz, last_error_code text, created_at timestamptz NOT NULL DEFAULT now(),
- updated_at timestamptz NOT NULL DEFAULT now(), UNIQUE (provider,external_account_id), UNIQUE (agency_id,id)
+ updated_at timestamptz NOT NULL DEFAULT now(), UNIQUE (provider,external_account_id), UNIQUE (agency_id,id),
+ FOREIGN KEY (connected_by,agency_id) REFERENCES agency_users(id,agency_id) ON DELETE SET NULL (connected_by)
 );
 CREATE INDEX IF NOT EXISTS channel_connections_tenant_provider_idx ON channel_connections(agency_id,provider,status);
 CREATE TABLE IF NOT EXISTS channel_webhook_events (
