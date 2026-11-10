@@ -11,6 +11,8 @@ const schema = z.object({
   OPENAI_EMBEDDING_MODEL: z.string().default('text-embedding-3-small'),
   INGESTION_API_KEY: z.string().min(32),
   JWT_SECRET: z.string().min(32),
+  ARA_CHANNEL_ENCRYPTION_KEY: z.preprocess(value => value === '' ? undefined : value, z.string().optional()),
+  ARA_CHANNEL_ENCRYPTION_KEY_VERSION: z.string().default('v1'),
   RAG_TOP_K: z.coerce.number().int().min(1).max(20).default(6),
   RAG_MIN_SIMILARITY: z.coerce.number().min(0).max(1).default(0.28),
   WHATSAPP_AGENCY_ID: z.preprocess(value => value === '' ? undefined : value, z.string().uuid().optional()),
@@ -43,6 +45,7 @@ export class ConfigService implements OnModuleInit {
     const parsed = schema.safeParse(process.env);
     if (!parsed.success) throw new Error(parsed.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join('; '));
     const wa = parsed.data;
+    if (wa.ARA_CHANNEL_ENCRYPTION_KEY) { const k=wa.ARA_CHANNEL_ENCRYPTION_KEY; const validHex=/^[0-9a-f]{64}$/i.test(k); let validBase64=false; try { validBase64=Buffer.from(k,'base64').length===32; } catch {} if (!validHex&&!validBase64) throw new Error('ARA_CHANNEL_ENCRYPTION_KEY must encode exactly 32 bytes (64 hex characters or base64).'); }
     const inboundConfigured = Boolean(wa.WHATSAPP_VERIFY_TOKEN || wa.WHATSAPP_APP_SECRET);
     if (inboundConfigured && !(wa.WHATSAPP_AGENCY_ID && wa.WHATSAPP_PHONE_NUMBER_ID && wa.WHATSAPP_VERIFY_TOKEN && wa.WHATSAPP_APP_SECRET)) {
       throw new Error('Inbound WhatsApp webhooks require WHATSAPP_AGENCY_ID, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_VERIFY_TOKEN and WHATSAPP_APP_SECRET.');
