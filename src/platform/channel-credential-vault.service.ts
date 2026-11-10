@@ -49,7 +49,8 @@ export class ChannelCredentialVault {
       FROM channel_connections WHERE provider=$1 AND status IN ('pending','active','reauthorization_required') AND webhook_secret_hash=$2 ORDER BY updated_at DESC LIMIT 2`,[provider,hash]);
     if(r.rows.length>1) throw new ServiceUnavailableException('Webhook verification token maps to multiple channel connections');
     const row=r.rows[0];if(!row)return null;
+    const credentials=this.decrypt(row.encrypted_credentials,row.keyVersion);
     await this.db.query('UPDATE channel_connections SET webhook_verified_at=now() WHERE id=$1 AND agency_id=$2',[row.id,row.agencyId]);
-    return {id:row.id,agencyId:row.agencyId,provider:row.provider,externalAccountId:row.externalAccountId,externalPhoneNumberId:row.externalPhoneNumberId,credentials:this.decrypt(row.encrypted_credentials,row.keyVersion),keyVersion:row.keyVersion,webhookVerified:true};
+    return {id:row.id,agencyId:row.agencyId,provider:row.provider,externalAccountId:row.externalAccountId,externalPhoneNumberId:row.externalPhoneNumberId,credentials,keyVersion:row.keyVersion,webhookVerified:true};
   }
 }
