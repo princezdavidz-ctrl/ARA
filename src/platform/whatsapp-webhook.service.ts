@@ -9,14 +9,12 @@ export class WhatsAppWebhookService {
   constructor(private readonly db: DatabaseService, private readonly config: ConfigService, private readonly vault: ChannelCredentialVault) {}
 
   async verifySubscription(mode: string, token: string, challenge: string): Promise<string> {
-    const expected = this.config.get('WHATSAPP_VERIFY_TOKEN');
-    const a = Buffer.from(token || '');
-    const b = Buffer.from(expected || '');
-    const legacyValid = Boolean(expected && a.length === b.length && timingSafeEqual(a, b));
-    const tenantConnection = !legacyValid && token ? await this.vault.findByVerifyToken('whatsapp', token) : null;
-    if (mode !== 'subscribe' || (!legacyValid && !tenantConnection) || !challenge) {
-      throw new UnauthorizedException('WhatsApp webhook verification failed');
-    }
+    if(mode!=='subscribe'||!challenge) throw new UnauthorizedException('WhatsApp webhook verification failed');
+    const expected=this.config.get('WHATSAPP_VERIFY_TOKEN');
+    const a=Buffer.from(token||''),b=Buffer.from(expected||'');
+    const legacyValid=Boolean(expected&&a.length===b.length&&timingSafeEqual(a,b));
+    const tenantConnection=!legacyValid&&token?await this.vault.findByVerifyToken('whatsapp',token):null;
+    if(!legacyValid&&!tenantConnection) throw new UnauthorizedException('WhatsApp webhook verification failed');
     return challenge;
   }
 
