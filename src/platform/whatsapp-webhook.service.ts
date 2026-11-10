@@ -8,7 +8,7 @@ import { ChannelCredentialVault } from './channel-credential-vault.service';
 export class WhatsAppWebhookService {
   constructor(private readonly db: DatabaseService, private readonly config: ConfigService, private readonly vault: ChannelCredentialVault) {}
 
-  verifySubscription(mode: string, token: string, challenge: string): string {
+  async verifySubscription(mode: string, token: string, challenge: string): Promise<string> {
     const expected = this.config.get('WHATSAPP_VERIFY_TOKEN');
     const a = Buffer.from(token || '');
     const b = Buffer.from(expected || '');
