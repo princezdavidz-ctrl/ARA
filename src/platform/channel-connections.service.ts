@@ -55,12 +55,14 @@ export class ChannelConnectionsService {
     this.requireManager(user);
     const provider=String(body?.provider||'') as Provider;
     const displayName=String(body?.displayName||'').trim();
-    const externalAccountId=String(body?.externalAccountId||'').trim();
+    let externalAccountId=String(body?.externalAccountId||'').trim();
+    if(provider==='email') externalAccountId=externalAccountId.toLowerCase();
     const phone=body?.externalPhoneNumberId==null?null:String(body.externalPhoneNumberId).trim();
     const credentials=this.safeCredentials(body?.credentials);
     if (!providers.includes(provider)||displayName.length<2||displayName.length>120||!externalAccountId||externalAccountId.length>255||(phone&&phone.length>255)) {
       throw new BadRequestException('Provide a supported provider, displayName, externalAccountId and valid optional externalPhoneNumberId');
     }
+    if(provider==='email'&&!/^\S+@\S+\.\S+$/.test(externalAccountId)) throw new BadRequestException('Email externalAccountId must be the receiving mailbox address');
     const encrypted=this.encrypt(credentials),keyVersion=String(process.env.ARA_CHANNEL_ENCRYPTION_KEY_VERSION||'v1').slice(0,32),verifyToken=credentials.webhookVerifyToken?createHash('sha256').update(String(credentials.webhookVerifyToken)).digest('hex'):null;
     try {
       return await this.db.transaction(async client=>{
@@ -76,7 +78,20 @@ export class ChannelConnectionsService {
     this.requireManager(user);
     const connection=await this.vault.getForTenantConnection(user.agencyId,id);
     if(!connection) throw new NotFoundException('Channel connection not found');
-    if(!['whatsapp','instagram'].includes(connection.provider)) throw new BadRequestException('Automated account verification is currently supported for WhatsApp and Instagram');
+    if(connection.provider==='email'||connection.provider==='tiktok'){
+      const required=connection.provider==='email'?['webhookSecret','apiKey','fromAddress']:['webhookSecret','accessToken'];
+      const missing=required.filter(key=>!connection.credentials[key]?.trim());
+      if(missing.length) throw new BadRequestException('Missing required encrypted credentials: '+missing.join(', '));
+      if(connection.provider==='email'&&!/^\S+@\S+\.\S+$/.test(connection.credentials.fromAddress)) throw new BadRequestException('Email fromAddress must be a valid verified sender address');
+      return this.db.transaction(async client=>{
+        const updated=await client.query<ConnectionRow>('UPDATE channel_connections SET status=\'active\',last_verified_at=now(),last_error_code=NULL,updated_at=now() WHERE agency_id=$1 AND id=$2 RETURNING '+this.projection(),[user.agencyId,id]);
+        if(!updated.rowCount) throw new NotFoundException('Channel connection not found');
+        await client.query('INSERT INTO audit_logs(agency_id,actor_user_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5,$6)',
+          [user.agencyId,user.id,'channel.connection_activated','channel_connection',id,JSON.stringify({provider:connection.provider,verificationMethod:'credential_presence'})]);
+        return {connection:updated.rows[0],message:'Required credentials are present and the connection is active. Confirm provider webhook relay configuration and test a real inbound and outbound message.'};
+      });
+    }
+    if(!['whatsapp','instagram'].includes(connection.provider)) throw new BadRequestException('Unsupported channel provider');
     const token=connection.credentials.accessToken;
     if(!token||!connection.credentials.webhookVerifyToken) throw new BadRequestException('Connection requires accessToken and webhookVerifyToken credentials');
     if(!connection.webhookVerified) throw new BadRequestException('Complete the Meta webhook verification handshake before activating this connection');

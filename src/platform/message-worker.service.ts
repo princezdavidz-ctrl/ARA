@@ -30,13 +30,9 @@ export class MessageWorker implements OnModuleInit, OnModuleDestroy {
         if (!job) break;
         await this.processInbound(job);
       }
-      if (this.config.get('EMAIL_RESEND_API_KEY') && this.config.get('EMAIL_FROM_ADDRESS') && this.config.get('EMAIL_AGENCY_ID')) {
-        for (let i = 0; i < 5; i++) { const job = await this.claimEmailDelivery(); if (!job) break; await this.deliverEmail(job); }
-      }
+      for (let i = 0; i < 5; i++) { const job = await this.claimEmailDelivery(); if (!job) break; await this.deliverEmail(job); }
       for (let i=0;i<5;i++){const job=await this.claimInstagramDelivery();if(!job)break;await this.deliverInstagram(job);}
-      if (this.config.get('TIKTOK_ACCESS_TOKEN') && this.config.get('TIKTOK_BUSINESS_ID') && this.config.get('TIKTOK_AGENCY_ID')) {
-        for (let i=0;i<5;i++){const job=await this.claimTikTokDelivery();if(!job)break;await this.deliverTikTok(job);}
-      }
+      for (let i=0;i<5;i++){const job=await this.claimTikTokDelivery();if(!job)break;await this.deliverTikTok(job);}
       for (let i=0;i<5;i++){const job=await this.claimWhatsAppDelivery();if(!job)break;await this.deliverWhatsApp(job);}
     } catch (error) {
       this.logger.error('Message worker cycle failed', error instanceof Error ? error.stack : undefined);
@@ -78,10 +74,10 @@ export class MessageWorker implements OnModuleInit, OnModuleDestroy {
 
   private async claimEmailDelivery(): Promise<EmailDeliveryJob | null> {
     return this.db.transaction(async client => {
-      await client.query("UPDATE messages SET delivery_status='failed',delivery_started_at=NULL,delivery_error='Email delivery lease expired after final attempt' WHERE direction='outbound' AND delivery_status='sending' AND delivery_started_at < now()-interval '5 minutes' AND delivery_attempts>=5");
+      await client.query("UPDATE messages m SET delivery_status='failed',delivery_started_at=NULL,delivery_error='Email delivery lease expired after final attempt' FROM conversations cv WHERE cv.id=m.conversation_id AND cv.agency_id=m.agency_id AND cv.channel='email' AND m.direction='outbound' AND m.delivery_status='sending' AND m.delivery_started_at < now()-interval '5 minutes' AND m.delivery_attempts>=5");
       const result = await client.query<EmailDeliveryJob>(
-        "SELECT m.id,m.agency_id AS \"agencyId\",m.conversation_id AS \"conversationId\",m.body,COALESCE(m.subject,(SELECT im.subject FROM messages im WHERE im.agency_id=m.agency_id AND im.conversation_id=m.conversation_id AND im.direction='inbound' AND im.subject IS NOT NULL ORDER BY im.created_at DESC LIMIT 1),'Re: Your enquiry') AS subject,cv.customer_contact AS recipient,m.delivery_attempts AS attempts FROM messages m JOIN conversations cv ON cv.id=m.conversation_id AND cv.agency_id=m.agency_id WHERE m.direction='outbound' AND cv.agency_id=$1 AND cv.channel='email' AND cv.customer_contact IS NOT NULL AND m.delivery_attempts<5 AND ((m.delivery_status='queued' AND (m.delivery_next_attempt_at IS NULL OR m.delivery_next_attempt_at<=now())) OR (m.delivery_status='sending' AND m.delivery_started_at < now()-interval '5 minutes')) ORDER BY m.created_at LIMIT 1 FOR UPDATE OF m SKIP LOCKED",
-        [this.config.get('EMAIL_AGENCY_ID')],
+        "SELECT m.id,m.agency_id AS \"agencyId\",m.conversation_id AS \"conversationId\",m.body,COALESCE(m.subject,(SELECT im.subject FROM messages im WHERE im.agency_id=m.agency_id AND im.conversation_id=m.conversation_id AND im.direction='inbound' AND im.subject IS NOT NULL ORDER BY im.created_at DESC LIMIT 1),'Re: Your enquiry') AS subject,cv.customer_contact AS recipient,cv.channel_connection_id AS \"connectionId\",m.delivery_attempts AS attempts FROM messages m JOIN conversations cv ON cv.id=m.conversation_id AND cv.agency_id=m.agency_id LEFT JOIN channel_connections cc ON cc.id=cv.channel_connection_id AND cc.agency_id=cv.agency_id WHERE m.direction='outbound' AND (cv.channel_connection_id IS NULL OR cc.status='active') AND (cv.channel_connection_id IS NOT NULL OR ($1::uuid IS NOT NULL AND cv.agency_id=$1)) AND cv.channel='email' AND cv.customer_contact IS NOT NULL AND m.delivery_attempts<5 AND ((m.delivery_status='queued' AND (m.delivery_next_attempt_at IS NULL OR m.delivery_next_attempt_at<=now())) OR (m.delivery_status='sending' AND m.delivery_started_at < now()-interval '5 minutes')) ORDER BY m.created_at LIMIT 1 FOR UPDATE OF m SKIP LOCKED",
+        [this.config.get('EMAIL_AGENCY_ID')||null],
       );
       const job = result.rows[0]; if (!job) return null;
       const attempts = Number(job.attempts) + 1;
@@ -91,8 +87,11 @@ export class MessageWorker implements OnModuleInit, OnModuleDestroy {
   }
 
   private async deliverEmail(job: EmailDeliveryJob): Promise<void> {
-    const apiKey = this.config.get('EMAIL_RESEND_API_KEY'); const from = this.config.get('EMAIL_FROM_ADDRESS');
-    if (!apiKey || !from) return;
+    const connection=job.connectionId?await this.vault.getForTenantConnection(job.agencyId,job.connectionId,true):null;
+    if(job.connectionId&&!connection){await this.failEmailDelivery(job,'The linked email connection is no longer active.',true);return;}
+    const apiKey=connection?.credentials.apiKey||this.config.get('EMAIL_RESEND_API_KEY');
+    const from=connection?.credentials.fromAddress||this.config.get('EMAIL_FROM_ADDRESS');
+    if(!apiKey||!from){await this.failEmailDelivery(job,'Email connection is missing apiKey or fromAddress credentials.',true);return;}
     try {
       const response = await fetch('https://api.resend.com/emails', {
         method: 'POST',
@@ -121,12 +120,12 @@ export class MessageWorker implements OnModuleInit, OnModuleDestroy {
     return this.claimSocialDelivery<InstagramDeliveryJob>('instagram',this.config.get('INSTAGRAM_AGENCY_ID'),true);
   }
   private async claimTikTokDelivery():Promise<TikTokDeliveryJob|null>{
-    return this.claimSocialDelivery<TikTokDeliveryJob>('tiktok',this.config.get('TIKTOK_AGENCY_ID'));
+    return this.claimSocialDelivery<TikTokDeliveryJob>('tiktok',this.config.get('TIKTOK_AGENCY_ID'),true);
   }
   private async claimSocialDelivery<T extends MessageJob>(channel:string,agencyId:string|undefined,allowDbConnection=false):Promise<T|null>{
     if(!agencyId&&!allowDbConnection)return null;
     return this.db.transaction(async client=>{
-      await client.query("UPDATE messages SET delivery_status='failed',delivery_started_at=NULL,delivery_error='Social delivery lease expired after final attempt' WHERE direction='outbound' AND delivery_status='sending' AND delivery_started_at < now()-interval '5 minutes' AND delivery_attempts>=5 AND ($1::uuid IS NULL OR agency_id=$1)",[agencyId||null]);
+      await client.query("UPDATE messages m SET delivery_status='failed',delivery_started_at=NULL,delivery_error='Social delivery lease expired after final attempt' FROM conversations cv WHERE cv.id=m.conversation_id AND cv.agency_id=m.agency_id AND cv.channel=$2 AND m.direction='outbound' AND m.delivery_status='sending' AND m.delivery_started_at < now()-interval '5 minutes' AND m.delivery_attempts>=5 AND ($1::uuid IS NULL OR m.agency_id=$1)",[agencyId||null,channel]);
       const result=await client.query<T>("SELECT m.id,m.agency_id AS \"agencyId\",m.conversation_id AS \"conversationId\",m.body,cv.customer_contact AS recipient,cv.channel_connection_id AS \"connectionId\",m.delivery_attempts AS attempts FROM messages m JOIN conversations cv ON cv.id=m.conversation_id AND cv.agency_id=m.agency_id LEFT JOIN channel_connections cc ON cc.id=cv.channel_connection_id AND cc.agency_id=cv.agency_id WHERE m.direction='outbound' AND (cv.channel_connection_id IS NULL OR cc.status='active') AND ((cv.channel_connection_id IS NOT NULL AND $3::boolean=true) OR ($1::uuid IS NOT NULL AND cv.agency_id=$1)) AND cv.channel=$2 AND cv.customer_contact IS NOT NULL AND m.delivery_attempts<5 AND ((m.delivery_status='queued' AND (m.delivery_next_attempt_at IS NULL OR m.delivery_next_attempt_at<=now())) OR (m.delivery_status='sending' AND m.delivery_started_at < now()-interval '5 minutes')) ORDER BY m.created_at LIMIT 1 FOR UPDATE OF m SKIP LOCKED",[agencyId||null,channel,allowDbConnection]);
       const job=result.rows[0];if(!job)return null;const attempts=Number(job.attempts)+1;
       await client.query("UPDATE messages SET delivery_status='sending',delivery_started_at=now(),delivery_attempts=$2,delivery_error=NULL WHERE id=$1",[job.id,attempts]);
@@ -148,8 +147,12 @@ export class MessageWorker implements OnModuleInit, OnModuleDestroy {
     }catch(error){await this.failSocialDelivery(job,error instanceof Error?error.message:'Unknown Instagram delivery error',false);}
   }
   private async deliverTikTok(job:TikTokDeliveryJob):Promise<void>{
-    const token=this.config.get('TIKTOK_ACCESS_TOKEN');const business=this.config.get('TIKTOK_BUSINESS_ID');
-    if(!token||!business)return;if(job.body.length>6000){await this.failSocialDelivery(job,'TikTok text reply exceeds 6,000 characters.',true);return;}
+    const connection=job.connectionId?await this.vault.getForTenantConnection(job.agencyId,job.connectionId,true):null;
+    if(job.connectionId&&!connection){await this.failSocialDelivery(job,'The linked TikTok connection is no longer active.',true);return;}
+    const token=connection?.credentials.accessToken||this.config.get('TIKTOK_ACCESS_TOKEN');
+    const business=connection?.externalAccountId||this.config.get('TIKTOK_BUSINESS_ID');
+    if(!token||!business){await this.failSocialDelivery(job,'TikTok connection is missing accessToken or business account credentials.',true);return;}
+    if(job.body.length>6000){await this.failSocialDelivery(job,'TikTok text reply exceeds 6,000 characters.',true);return;}
     try{
       const response=await fetch('https://business-api.tiktok.com/open_api/v1.3/business/message/send/',{method:'POST',headers:{'Access-Token':token,'Content-Type':'application/json'},body:JSON.stringify({business_id:business,recipient_type:'CONVERSATION',recipient:job.recipient,message_type:'TEXT',text:{body:job.body}}),signal:AbortSignal.timeout(15000)});
       const data=await response.json().catch(()=>({})) as {code?:number;message?:string;data?:{message_id?:string}};
@@ -166,7 +169,7 @@ export class MessageWorker implements OnModuleInit, OnModuleDestroy {
 
   private async claimWhatsAppDelivery(): Promise<WhatsAppDeliveryJob | null> {
     return this.db.transaction(async client => {
-      await client.query("UPDATE messages SET delivery_status='failed',delivery_started_at=NULL,delivery_error='Delivery worker lease expired after final attempt' WHERE direction='outbound' AND delivery_status='sending' AND delivery_started_at < now()-interval '5 minutes' AND delivery_attempts>=5");
+      await client.query("UPDATE messages m SET delivery_status='failed',delivery_started_at=NULL,delivery_error='Delivery worker lease expired after final attempt' FROM conversations cv WHERE cv.id=m.conversation_id AND cv.agency_id=m.agency_id AND cv.channel='whatsapp' AND m.direction='outbound' AND m.delivery_status='sending' AND m.delivery_started_at < now()-interval '5 minutes' AND m.delivery_attempts>=5");
       const result = await client.query<WhatsAppDeliveryJob>("SELECT m.id,m.agency_id AS \"agencyId\",m.conversation_id AS \"conversationId\",m.body,cv.customer_contact AS recipient,cv.channel_connection_id AS \"connectionId\",m.delivery_attempts AS attempts FROM messages m JOIN conversations cv ON cv.id=m.conversation_id AND cv.agency_id=m.agency_id LEFT JOIN channel_connections cc ON cc.id=cv.channel_connection_id AND cc.agency_id=cv.agency_id WHERE m.direction='outbound' AND (cv.channel_connection_id IS NULL OR cc.status='active') AND (cv.channel_connection_id IS NOT NULL OR ($1::uuid IS NOT NULL AND cv.agency_id=$1)) AND cv.channel='whatsapp' AND cv.customer_contact IS NOT NULL AND m.delivery_attempts<5 AND ((m.delivery_status='queued' AND (m.delivery_next_attempt_at IS NULL OR m.delivery_next_attempt_at<=now())) OR (m.delivery_status='sending' AND m.delivery_started_at < now()-interval '5 minutes')) ORDER BY m.created_at LIMIT 1 FOR UPDATE OF m SKIP LOCKED", [this.config.get('WHATSAPP_AGENCY_ID')||null]);
       const job = result.rows[0];
       if (!job) return null;
