@@ -2,28 +2,34 @@ import { Injectable, ServiceUnavailableException, UnauthorizedException } from '
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { DatabaseService } from '../database/database.service';
 import { ConfigService } from '../config/config.service';
+import { ChannelCredentialVault } from './channel-credential-vault.service';
 
 @Injectable()
 export class InstagramWebhookService {
-  constructor(private readonly db: DatabaseService, private readonly config: ConfigService) {}
+  constructor(private readonly db: DatabaseService, private readonly config: ConfigService, private readonly vault: ChannelCredentialVault) {}
   verifySubscription(mode: string, token: string, challenge: string): string {
     const expected=this.config.get('INSTAGRAM_VERIFY_TOKEN');
-    if(!expected) throw new ServiceUnavailableException('Instagram channel is not configured');
-    const a=Buffer.from(token||''); const b=Buffer.from(expected);
-    if(mode!=='subscribe'||a.length!==b.length||!timingSafeEqual(a,b)||!challenge) throw new UnauthorizedException('Instagram webhook verification failed');
+    const a=Buffer.from(token||''); const b=Buffer.from(expected||'');
+    const legacyValid=Boolean(expected&&a.length===b.length&&timingSafeEqual(a,b));
+    const tenantConnection=!legacyValid&&token?await this.vault.findByVerifyToken('instagram',token):null;
+    if(mode!=='subscribe'||(!legacyValid&&!tenantConnection)||!challenge) throw new UnauthorizedException('Instagram webhook verification failed');
     return challenge;
   }
   async receive(rawBody: Buffer|undefined, signature: string|undefined, payload: any) {
-    const secret=this.config.get('INSTAGRAM_APP_SECRET'); const agencyId=this.config.get('INSTAGRAM_AGENCY_ID');
-    const accountId=this.config.get('INSTAGRAM_ACCOUNT_ID');
-    if(!secret||!agencyId||!accountId) throw new ServiceUnavailableException('Instagram channel is not configured');
+    const secret=this.config.get('INSTAGRAM_APP_SECRET');
+    const legacyAgencyId=this.config.get('INSTAGRAM_AGENCY_ID');
+    const legacyAccountId=this.config.get('INSTAGRAM_ACCOUNT_ID');
+    if(!secret) throw new ServiceUnavailableException('Instagram Meta app signature secret is not configured');
     if(!rawBody||!signature||!/^sha256=[a-f0-9]{64}$/i.test(signature)) throw new UnauthorizedException('Missing or invalid Instagram signature');
     const expected=createHmac('sha256',secret).update(rawBody).digest(); const supplied=Buffer.from(signature.slice(7),'hex');
     if(supplied.length!==expected.length||!timingSafeEqual(supplied,expected)) throw new UnauthorizedException('Invalid Instagram webhook signature');
     if(!['instagram','page'].includes(String(payload?.object))||!Array.isArray(payload?.entry)) return {received:true,accepted:0};
     let accepted=0;
     for(const entry of payload.entry){
-      if(String(entry?.id||'')!==accountId) continue;
+      const accountId=String(entry?.id||'');
+      const connection=await this.vault.findByProviderAccount('instagram',accountId);
+      const agencyId=connection?.agencyId||(legacyAgencyId&&legacyAccountId===accountId?legacyAgencyId:undefined);
+      if(!agencyId) continue;
       for(const event of entry.messaging||[]){
         const sender=String(event?.sender?.id||''); const messageId=String(event?.message?.mid||'');
         if(!sender||!messageId||event?.message?.is_echo) continue;
