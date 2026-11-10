@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
+import { createDecipheriv } from 'node:crypto';
 import { ConfigService } from '../config/config.service';
 
 type DarajaToken = { access_token: string; expires_in: string };
@@ -7,17 +8,25 @@ type DarajaToken = { access_token: string; expires_in: string };
 export class MpesaService {
   constructor(private readonly db: DatabaseService, private readonly config: ConfigService) {}
 
-  private setting(name: 'MPESA_CONSUMER_KEY'|'MPESA_CONSUMER_SECRET'|'MPESA_PASSKEY'|'MPESA_SHORT_CODE'|'MPESA_CALLBACK_URL'|'MPESA_ENV') {
-    return this.config.get(name);
+  private setting(name: 'MPESA_CALLBACK_URL') { return this.config.get(name); }
+  private async darajaSettings() {
+    const saved=await this.db.query<any>("SELECT environment,encrypted_credentials FROM platform_integrations WHERE provider='mpesa_daraja' AND is_enabled=true");
+    if(saved.rowCount){
+      const raw=String(process.env.ARA_CHANNEL_ENCRYPTION_KEY||'').trim();
+      const key=/^[0-9a-f]{64}$/i.test(raw)?Buffer.from(raw,'hex'):Buffer.from(raw,'base64');
+      if(key.length!==32)throw new ServiceUnavailableException('ARA_CHANNEL_ENCRYPTION_KEY must encode 32 bytes');
+      const data=saved.rows[0].encrypted_credentials as Buffer;
+      if(!Buffer.isBuffer(data)||data.length<32||data.subarray(0,4).toString()!=='ARA1')throw new ServiceUnavailableException('Stored Daraja credentials are invalid');
+      try{const decipher=createDecipheriv('aes-256-gcm',key,data.subarray(4,16));decipher.setAuthTag(data.subarray(16,32));const credentials=JSON.parse(Buffer.concat([decipher.update(data.subarray(32)),decipher.final()]).toString('utf8'));return {environment:saved.rows[0].environment,consumerKey:credentials.consumerKey,consumerSecret:credentials.consumerSecret,passkey:credentials.passkey,shortCode:credentials.shortCode};}catch{throw new ServiceUnavailableException('Unable to decrypt stored Daraja credentials');}
+    }
+    return {environment:this.config.get('MPESA_ENV'),consumerKey:this.config.get('MPESA_CONSUMER_KEY'),consumerSecret:this.config.get('MPESA_CONSUMER_SECRET'),passkey:this.config.get('MPESA_PASSKEY'),shortCode:this.config.get('MPESA_SHORT_CODE')};
   }
-  private baseUrl() {
-    return this.setting('MPESA_ENV') === 'production' ? 'https://api.safaricom.co.ke' : 'https://sandbox.safaricom.co.ke';
-  }
-  private async token(): Promise<string> {
-    const key=this.setting('MPESA_CONSUMER_KEY'), secret=this.setting('MPESA_CONSUMER_SECRET');
+  private baseUrl(environment:string) { return environment === 'production' ? 'https://api.safaricom.co.ke' : 'https://sandbox.safaricom.co.ke'; }
+  private async token(settings:any): Promise<string> {
+    const key=settings.consumerKey, secret=settings.consumerSecret;
     if(!key||!secret) throw new ServiceUnavailableException('M-Pesa Daraja is not configured');
     const auth=Buffer.from(key+':'+secret).toString('base64');
-    const response=await fetch(this.baseUrl()+'/oauth/v1/generate?grant_type=client_credentials',{headers:{Authorization:'Basic '+auth}});
+    const response=await fetch(this.baseUrl(settings.environment)+'/oauth/v1/generate?grant_type=client_credentials',{headers:{Authorization:'Basic '+auth}});
     if(!response.ok) throw new ServiceUnavailableException('M-Pesa authentication failed');
     const data=await response.json() as DarajaToken;
     if(!data.access_token) throw new ServiceUnavailableException('M-Pesa did not return an access token');
@@ -38,7 +47,8 @@ export class MpesaService {
     if(!['owner','admin'].includes(user.role)) throw new ForbiddenException('Only company owners and administrators can pay invoices');
     if(!/^[0-9a-f-]{36}$/i.test(invoiceId)) throw new BadRequestException('Invalid invoice ID');
     const phone=this.normalizePhone(phoneInput);
-    const callback=this.setting('MPESA_CALLBACK_URL'), shortcode=this.setting('MPESA_SHORT_CODE'), passkey=this.setting('MPESA_PASSKEY');
+    const settings=await this.darajaSettings();
+    const callback=this.setting('MPESA_CALLBACK_URL'), shortcode=settings.shortCode, passkey=settings.passkey;
     if(!callback||!shortcode||!passkey) throw new ServiceUnavailableException('M-Pesa callback URL, shortcode and passkey must be configured');
     let invoiceResult=await this.db.query<any>(`SELECT i.id,i.agency_id,i.invoice_number,i.status,i.currency,i.total_minor
       FROM billing_invoices i WHERE i.id=$1 AND i.agency_id=$2`,[invoiceId,user.agencyId]);
@@ -50,11 +60,11 @@ export class MpesaService {
     if(amount<=0n||amount%100n!==0n) throw new BadRequestException('M-Pesa STK Push requires an invoice total in whole KES');
     const existing=await this.db.query<any>(`SELECT id FROM billing_payments WHERE agency_id=$1 AND invoice_id=$2 AND provider='mpesa' AND status='pending' AND created_at>now()-interval '10 minutes' LIMIT 1`,[user.agencyId,invoiceId]);
     if(existing.rowCount) throw new BadRequestException('An M-Pesa payment request is already pending for this invoice. Wait for its result before retrying.');
-    const accessToken=await this.token();
+    const accessToken=await this.token(settings);
     const timestamp=this.timestamp();
     const password=Buffer.from(String(shortcode)+String(passkey)+timestamp).toString('base64');
     const body={BusinessShortCode:shortcode,Password:password,Timestamp:timestamp,TransactionType:'CustomerPayBillOnline',Amount:Number(amount/100n),PartyA:phone,PartyB:shortcode,PhoneNumber:phone,CallBackURL:callback,AccountReference:String(invoice.invoice_number).slice(0,12),TransactionDesc:'ARA subscription'};
-    const response=await fetch(this.baseUrl()+'/mpesa/stkpush/v1/processrequest',{method:'POST',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const response=await fetch(this.baseUrl(settings.environment)+'/mpesa/stkpush/v1/processrequest',{method:'POST',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify(body)});
     const result=await response.json().catch(()=>({})) as any;
     if(!response.ok||String(result.ResponseCode)!=='0'||!result.CheckoutRequestID||!result.MerchantRequestID) throw new ServiceUnavailableException('M-Pesa could not start the payment request');
     await this.db.query(`INSERT INTO billing_payments(agency_id,invoice_id,provider,provider_payment_ref,status,amount_minor,currency,provider_payload,mpesa_checkout_request_id,mpesa_merchant_request_id,mpesa_phone)
