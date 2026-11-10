@@ -16,7 +16,7 @@
 ## Tenant isolation requirements
 - The existing agencies table remains the tenant root during compatibility migration.
 - Every company-owned query must be scoped by authenticated agency_id; never trust a tenant ID supplied by a browser.
-- Provider account identifiers resolve to a single channel connection. Credentials are encrypted at rest and never returned by CRM/admin list APIs.
+- Provider account identifiers resolve to a single active channel connection. Credentials are encrypted at rest and never returned by CRM/admin list APIs. Email and TikTok relay signatures are validated using the selected tenant connection's webhook secret.
 - Platform support uses a separate platform identity, least-privilege role, explicit reason, and platform audit entry.
 - Knowledge retrieval filters by tenant and knowledge base before ranking.
 - Webhook events are deduplicated per connection and provider event ID.
@@ -31,7 +31,7 @@ Each plan defines recurring price, included message/AI quotas, channel and seat 
 ## Delivery sequence
 1. Platform foundation: tenant settings, platform-admin identity/audit, subscription/usage/channel schema.
 2. Tenant-safe domain services and role-guarded Super Admin APIs.
-3. Database-backed provider connections, encrypted credential lifecycle, webhook account resolution, and multi-connection workers.
+3. Database-backed provider connections, encrypted credential lifecycle, webhook account resolution, and multi-connection workers (WhatsApp, Instagram, email, TikTok).
 4. Generalized knowledge bases and industry templates; supervised AI policy enforcement.
 5. Subscription lifecycle, invoice generation, payment integration, and usage enforcement.
 6. Separate Super Admin and Company CRM frontends.
