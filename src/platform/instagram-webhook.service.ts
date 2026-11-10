@@ -7,7 +7,7 @@ import { ChannelCredentialVault } from './channel-credential-vault.service';
 @Injectable()
 export class InstagramWebhookService {
   constructor(private readonly db: DatabaseService, private readonly config: ConfigService, private readonly vault: ChannelCredentialVault) {}
-  verifySubscription(mode: string, token: string, challenge: string): string {
+  async verifySubscription(mode: string, token: string, challenge: string): Promise<string> {
     const expected=this.config.get('INSTAGRAM_VERIFY_TOKEN');
     const a=Buffer.from(token||''); const b=Buffer.from(expected||'');
     const legacyValid=Boolean(expected&&a.length===b.length&&timingSafeEqual(a,b));
