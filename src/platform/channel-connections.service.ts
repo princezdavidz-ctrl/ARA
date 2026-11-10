@@ -79,6 +79,7 @@ export class ChannelConnectionsService {
     if(!['whatsapp','instagram'].includes(connection.provider)) throw new BadRequestException('Automated account verification is currently supported for WhatsApp and Instagram');
     const token=connection.credentials.accessToken;
     if(!token||!connection.credentials.webhookVerifyToken) throw new BadRequestException('Connection requires accessToken and webhookVerifyToken credentials');
+    if(!connection.webhookVerified) throw new BadRequestException('Complete the Meta webhook verification handshake before activating this connection');
     const apiVersion=connection.provider==='whatsapp'?(process.env.WHATSAPP_API_VERSION||'v27.0'):(process.env.INSTAGRAM_API_VERSION||'v26.0');
     const accountId=connection.provider==='whatsapp'?connection.externalPhoneNumberId:connection.externalAccountId;
     if(!accountId) throw new BadRequestException('The provider account identifier is incomplete');
