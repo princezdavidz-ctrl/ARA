@@ -69,7 +69,8 @@ export class BillingService {
       maxSeats:body?.maxSeats??row.max_seats,overageMessagePriceMinor:body?.overageMessagePriceMinor??row.overage_message_price_minor,
       overageAiPriceMinor:body?.overageAiPriceMinor??row.overage_ai_price_minor
     });
-    const active=body?.isActive===undefined?row.is_active:Boolean(body.isActive);
+    if(body?.isActive!==undefined&&typeof body.isActive!=='boolean')throw new BadRequestException('isActive must be boolean');
+    const active=body?.isActive===undefined?row.is_active:body.isActive;
     const result=await this.db.query('UPDATE subscription_plans SET code=$2,name=$3,description=$4,currency=$5,monthly_price_minor=$6,included_messages=$7,included_ai_responses=$8,max_channels=$9,max_seats=$10,overage_message_price_minor=$11,overage_ai_price_minor=$12,is_active=$13,updated_at=now() WHERE id=$1 RETURNING id,code,name,description,currency,monthly_price_minor AS "monthlyPriceMinor",included_messages AS "includedMessages",included_ai_responses AS "includedAiResponses",max_channels AS "maxChannels",max_seats AS "maxSeats",overage_message_price_minor AS "overageMessagePriceMinor",overage_ai_price_minor AS "overageAiPriceMinor",is_active AS "isActive"',
       [id,p.code,p.name,p.description,p.currency,p.monthlyPriceMinor,p.includedMessages,p.includedAiResponses,p.maxChannels,p.maxSeats,p.overageMessagePriceMinor,p.overageAiPriceMinor,active]);
     await this.db.query('INSERT INTO platform_audit_logs(platform_admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[admin.id,'billing.plan_updated','subscription_plan',id,JSON.stringify({isActive:active})]);
@@ -87,7 +88,8 @@ export class BillingService {
     if(!body?.currentPeriodEnd){if(interval==='year')end.setFullYear(end.getFullYear()+1);else end.setMonth(end.getMonth()+1);}
     if(!Number.isFinite(start.getTime())||!Number.isFinite(end.getTime())||end<=start)throw new BadRequestException('Invalid subscription billing period');
     const trialEndsAt=body?.trialEndsAt?new Date(body.trialEndsAt):null;
-    if(trialEndsAt&&!Number.isFinite(trialEndsAt.getTime()))throw new BadRequestException('Invalid trialEndsAt');
+    if(trialEndsAt&&(!Number.isFinite(trialEndsAt.getTime())||trialEndsAt<start||trialEndsAt>end))throw new BadRequestException('trialEndsAt must fall within the subscription period');
+    if(status==='trialing'&&!trialEndsAt)throw new BadRequestException('trialEndsAt is required for a trialing subscription');
     return this.db.transaction(async client=>{
       const agency=await client.query('SELECT id FROM agencies WHERE id=$1 FOR UPDATE',[agencyId]);
       if(!agency.rowCount)throw new NotFoundException('Company not found');
@@ -144,6 +146,7 @@ export class BillingService {
 
   async tenantSummary(user:AraUser){
     this.requireBillingManager(user);
+    await this.db.query("UPDATE company_subscriptions SET status='expired',updated_at=now() WHERE agency_id=$1 AND status IN ('trialing','active','past_due') AND current_period_end<=now()",[user.agencyId]);
     const subscription=await this.db.query<any>(`SELECT cs.id,cs.status,cs.billing_interval AS "billingInterval",cs.currency,cs.unit_price_minor AS "unitPriceMinor",cs.current_period_start AS "currentPeriodStart",cs.current_period_end AS "currentPeriodEnd",cs.cancel_at_period_end AS "cancelAtPeriodEnd",p.code AS "planCode",p.name AS "planName",p.included_messages AS "includedMessages",p.included_ai_responses AS "includedAiResponses",p.max_channels AS "maxChannels",p.max_seats AS "maxSeats",p.overage_message_price_minor AS "overageMessagePriceMinor",p.overage_ai_price_minor AS "overageAiPriceMinor"
       FROM company_subscriptions cs JOIN subscription_plans p ON p.id=cs.plan_id
       WHERE cs.agency_id=$1 AND cs.status IN ('trialing','active','past_due') ORDER BY cs.created_at DESC LIMIT 1`,[user.agencyId]);
