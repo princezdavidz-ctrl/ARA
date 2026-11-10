@@ -15,6 +15,7 @@ export class AiUsageQuotaService {
         FROM company_subscriptions cs JOIN subscription_plans p ON p.id=cs.plan_id
         WHERE cs.agency_id=$1 AND cs.status IN ('active','trialing','past_due')
           AND cs.current_period_start<=now() AND cs.current_period_end>now()
+          AND (cs.status<>'trialing' OR cs.trial_ends_at IS NULL OR cs.trial_ends_at>now())
         ORDER BY cs.created_at DESC LIMIT 1 FOR UPDATE OF cs`, [agencyId]);
       const sub = subscription.rows[0];
       if (!sub) return { allowed: false, reason: 'No active subscription is available for AI responses.' };
