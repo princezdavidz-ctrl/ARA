@@ -27,6 +27,23 @@ describe('AnswerService',()=>{
     expect(ai.generate.mock.calls[0][0]).toContain('Use plain language.');
   });
 
+  it('does not call retrieval, embeddings or generation when tenant AI is disabled',async()=>{
+    const search:any={search:jest.fn()};
+    const ai:any={generate:jest.fn()};
+    const db:any={query:jest.fn().mockResolvedValue({rows:[{
+      industry:'general',default_language:'en',enabled:false
+    }]})};
+    const config:any={get:jest.fn().mockReturnValue(0.3)};
+    const service=new AnswerService(search,ai,config,db);
+    const result=await service.answer({message:'Can you help me?',preferredLanguage:'auto',filters:{}} as any,agencyId);
+
+    expect(result.status).toBe('needs_human');
+    expect(result.confidence).toBe('low');
+    expect(result.escalationReason).toBe('Company AI assistant is disabled.');
+    expect(search.search).not.toHaveBeenCalled();
+    expect(ai.generate).not.toHaveBeenCalled();
+  });
+
   it('does not call the model when tenant knowledge has no relevant evidence',async()=>{
     const search:any={search:jest.fn().mockResolvedValue([])};
     const ai:any={generate:jest.fn()};
