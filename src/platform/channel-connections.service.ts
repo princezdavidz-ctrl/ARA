@@ -76,7 +76,20 @@ export class ChannelConnectionsService {
     this.requireManager(user);
     const connection=await this.vault.getForTenantConnection(user.agencyId,id);
     if(!connection) throw new NotFoundException('Channel connection not found');
-    if(!['whatsapp','instagram'].includes(connection.provider)) throw new BadRequestException('Automated account verification is currently supported for WhatsApp and Instagram');
+    if(connection.provider==='email'||connection.provider==='tiktok'){
+      const required=connection.provider==='email'?['webhookSecret','apiKey','fromAddress']:['webhookSecret','accessToken'];
+      const missing=required.filter(key=>!connection.credentials[key]?.trim());
+      if(missing.length) throw new BadRequestException('Missing required encrypted credentials: '+missing.join(', '));
+      if(connection.provider==='email'&&!/^\\S+@\\S+\\.\\S+$/.test(connection.credentials.fromAddress)) throw new BadRequestException('Email fromAddress must be a valid verified sender address');
+      return this.db.transaction(async client=>{
+        const updated=await client.query<ConnectionRow>('UPDATE channel_connections SET status=\\'active\\',last_verified_at=now(),last_error_code=NULL,updated_at=now() WHERE agency_id=$1 AND id=$2 RETURNING '+this.projection(),[user.agencyId,id]);
+        if(!updated.rowCount) throw new NotFoundException('Channel connection not found');
+        await client.query('INSERT INTO audit_logs(agency_id,actor_user_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5,$6)',
+          [user.agencyId,user.id,'channel.connection_activated','channel_connection',id,JSON.stringify({provider:connection.provider,verificationMethod:'credential_presence'})]);
+        return {connection:updated.rows[0],message:'Required credentials are present and the connection is active. Confirm provider webhook relay configuration and test a real inbound and outbound message.'};
+      });
+    }
+    if(!['whatsapp','instagram'].includes(connection.provider)) throw new BadRequestException('Unsupported channel provider');
     const token=connection.credentials.accessToken;
     if(!token||!connection.credentials.webhookVerifyToken) throw new BadRequestException('Connection requires accessToken and webhookVerifyToken credentials');
     if(!connection.webhookVerified) throw new BadRequestException('Complete the Meta webhook verification handshake before activating this connection');
