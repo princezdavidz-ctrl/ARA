@@ -1,3 +1,4 @@
+import { UnauthorizedException } from '@nestjs/common';
 import { BillingService } from './billing.service';
 
 describe('BillingService',()=>{
@@ -42,4 +43,15 @@ describe('BillingService',()=>{
     await expect(service.createPlan(admin,{code:'invalid code',name:'Bad plan',currency:'KES',monthlyPriceMinor:-1})).rejects.toThrow('valid plan');
     expect(db.query).not.toHaveBeenCalled();
   });
+
+  it('rejects payment callbacks with an invalid HMAC signature',async()=>{
+    const db:any={query:jest.fn(),transaction:jest.fn()};
+    const config:any={get:jest.fn().mockReturnValue('test-billing-secret')};
+    const service=new BillingService(db,config);
+    const raw=Buffer.from(JSON.stringify({eventId:'evt-1'}));
+    const timestamp=String(Math.floor(Date.now()/1000));
+    await expect(service.paymentWebhook('mpesa',raw,timestamp,'sha256='+'0'.repeat(64),{})).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
 });
