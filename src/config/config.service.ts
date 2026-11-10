@@ -2,6 +2,7 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { z } from 'zod';
 
 const optionalSecret = z.preprocess(value => value === '' ? undefined : value, z.string().min(20).optional());
+const optionalRate = z.preprocess(value => value === '' || value === undefined ? undefined : value, z.coerce.number().min(0).optional());
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
@@ -11,6 +12,8 @@ const schema = z.object({
   OPENAI_MAX_RETRIES: z.coerce.number().int().min(0).max(3).default(1),
   OPENAI_CHAT_MODEL: z.string().default('gpt-4o-mini'),
   OPENAI_EMBEDDING_MODEL: z.string().default('text-embedding-3-small'),
+  AI_INPUT_USD_PER_1M_TOKENS: optionalRate,
+  AI_OUTPUT_USD_PER_1M_TOKENS: optionalRate,
   INGESTION_API_KEY: z.string().min(32),
   JWT_SECRET: z.string().min(32),
   ARA_CHANNEL_ENCRYPTION_KEY: z.preprocess(value => value === '' ? undefined : value, z.string().optional()),
@@ -31,7 +34,7 @@ const schema = z.object({
   INSTAGRAM_ACCESS_TOKEN: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
   INSTAGRAM_APP_SECRET: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
   INSTAGRAM_VERIFY_TOKEN: z.preprocess(value => value === '' ? undefined : value, z.string().min(32).optional()),
-  INSTAGRAM_API_VERSION: z.string().regex(/^v\d+\.\d+$/).default('v26.0'),
+  INSTAGRAM_API_VERSION: z.string().regex(/^v\\d+\\.\\d+$/).default('v26.0'),
   TIKTOK_AGENCY_ID: z.preprocess(value => value === '' ? undefined : value, z.string().uuid().optional()),
   TIKTOK_BUSINESS_ID: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
   TIKTOK_ACCESS_TOKEN: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
@@ -41,9 +44,9 @@ const schema = z.object({
   MPESA_CONSUMER_KEY: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
   MPESA_CONSUMER_SECRET: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
   MPESA_PASSKEY: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
-  MPESA_SHORT_CODE: z.preprocess(value => value === '' ? undefined : value, z.string().regex(/^\d+$/).optional()),
+  MPESA_SHORT_CODE: z.preprocess(value => value === '' ? undefined : value, z.string().regex(/^\\d+$/).optional()),
   MPESA_CALLBACK_URL: z.preprocess(value => value === '' ? undefined : value, z.string().url().optional()),
-  WHATSAPP_API_VERSION: z.string().regex(/^v\d+\.\d+$/).default('v27.0'),
+  WHATSAPP_API_VERSION: z.string().regex(/^v\\d+\\.\\d+$/).default('v27.0'),
 });
 export type Config = z.infer<typeof schema>;
 
