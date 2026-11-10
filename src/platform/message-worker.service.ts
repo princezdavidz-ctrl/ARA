@@ -134,7 +134,10 @@ export class MessageWorker implements OnModuleInit, OnModuleDestroy {
     });
   }
   private async deliverInstagram(job:InstagramDeliveryJob):Promise<void>{
-    const token=this.config.get('INSTAGRAM_ACCESS_TOKEN');const account=this.config.get('INSTAGRAM_ACCOUNT_ID');const version=this.config.get('INSTAGRAM_API_VERSION');
+    const connection=job.connectionId?await this.vault.getForTenantConnection(job.agencyId,job.connectionId,true):null;
+    if(job.connectionId&&!connection){await this.failSocialDelivery(job,'The linked Instagram connection is no longer active.',true);return;}
+    const token=connection?.credentials.accessToken||this.config.get('INSTAGRAM_ACCESS_TOKEN');
+    const account=connection?.externalAccountId||this.config.get('INSTAGRAM_ACCOUNT_ID');const version=this.config.get('INSTAGRAM_API_VERSION');
     if(!token||!account)return;if(job.body.length>1000){await this.failSocialDelivery(job,'Instagram text reply exceeds 1,000 characters.',true);return;}
     try{
       const response=await fetch('https://graph.instagram.com/'+version+'/'+account+'/messages',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({recipient:{id:job.recipient},message:{text:job.body}}),signal:AbortSignal.timeout(15000)});
@@ -174,10 +177,12 @@ export class MessageWorker implements OnModuleInit, OnModuleDestroy {
   }
 
   private async deliverWhatsApp(job: WhatsAppDeliveryJob): Promise<void> {
-    const token = this.config.get('WHATSAPP_ACCESS_TOKEN');
-    const phoneNumberId = this.config.get('WHATSAPP_PHONE_NUMBER_ID');
-    const apiVersion = this.config.get('WHATSAPP_API_VERSION');
-    if (!token || !phoneNumberId) return;
+    const connection=job.connectionId?await this.vault.getForTenantConnection(job.agencyId,job.connectionId,true):null;
+    if(job.connectionId&&!connection){await this.failWhatsAppDelivery(job,'The linked WhatsApp connection is no longer active.',true);return;}
+    const token=connection?.credentials.accessToken||this.config.get('WHATSAPP_ACCESS_TOKEN');
+    const phoneNumberId=connection?.externalPhoneNumberId||this.config.get('WHATSAPP_PHONE_NUMBER_ID');
+    const apiVersion=this.config.get('WHATSAPP_API_VERSION');
+    if(!token||!phoneNumberId)return;
     if (job.body.length > 4096) {
       await this.failWhatsAppDelivery(job, 'WhatsApp text messages cannot exceed 4096 characters.', true);
       return;
