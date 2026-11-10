@@ -31,6 +31,7 @@ describe('AnswerService',()=>{
     const result=await service.answer({message:'What is the response time?',preferredLanguage:'en',filters:{}} as any,agencyId,context);
     expect(result.status).toBe('needs_human');
     expect(result.escalationReason).toContain('human approval');
+    expect(quota.release).toHaveBeenCalledWith(agencyId,'ai-response:message-1');
     expect(ai.generateWithUsage.mock.calls[0][0]).toContain('industry is healthcare');
     expect(ai.generateWithUsage.mock.calls[0][0]).toContain('Use plain language.');
     const writes=db.query.mock.calls.filter((call:any[])=>String(call[0]).includes('INSERT INTO usage_records'));
@@ -95,6 +96,7 @@ describe('AnswerService',()=>{
     const result=await service.answer({message:'Please help',preferredLanguage:'en',filters:{}} as any,agencyId,{messageId:'message-limit'});
     expect(result.status).toBe('needs_human');
     expect(result.escalationReason).toBe('AI response allowance reached');
+    expect(search.search).not.toHaveBeenCalled();
     expect(ai.generateWithUsage).not.toHaveBeenCalled();
     expect(limitedQuota.consume).not.toHaveBeenCalled();
   });
