@@ -5,7 +5,7 @@ import { AnswerInput } from '../rag/contracts';
 import { ConfigService } from '../config/config.service';
 import { ChannelCredentialVault } from './channel-credential-vault.service';
 
-interface MessageJob { id: string; agencyId: string; conversationId: string; body: string; subject?: string | null; attempts: number; connectionId?: string | null; }
+interface MessageJob { id: string; agencyId: string; conversationId: string; channel?: string; body: string; subject?: string | null; attempts: number; connectionId?: string | null; }
 interface EmailDeliveryJob extends MessageJob { recipient: string; }
 interface WhatsAppDeliveryJob extends MessageJob { recipient: string; }
 interface InstagramDeliveryJob extends MessageJob { recipient: string; }
@@ -58,7 +58,7 @@ export class MessageWorker implements OnModuleInit, OnModuleDestroy {
 
   private async processInbound(job: MessageJob): Promise<void> {
     try {
-      const result = await this.answers.answer({ message: job.body, preferredLanguage: 'auto', filters: {} } as AnswerInput, job.agencyId);
+      const result = await this.answers.answer({ message: job.body, preferredLanguage: 'auto', filters: {} } as AnswerInput, job.agencyId, { channel: job.channel, conversationId: job.conversationId, messageId: job.id });
       await this.db.transaction(async client => {
         if(result.status==='answered'){
           await client.query("INSERT INTO messages(agency_id,conversation_id,direction,sender_type,body,subject,idempotency_key,delivery_status,processing_status) VALUES($1,$2,'outbound','ai',$3,$4,$5,'queued','not_applicable') ON CONFLICT(agency_id,idempotency_key) DO NOTHING", [job.agencyId, job.conversationId, result.answer, job.subject ? (job.subject.toLowerCase().startsWith('re:') ? job.subject : 'Re: ' + job.subject) : null, 'ai:' + job.id]);
