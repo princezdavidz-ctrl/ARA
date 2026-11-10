@@ -8,13 +8,13 @@ export class WhatsAppWebhookController {
   constructor(private readonly whatsapp: WhatsAppWebhookService) {}
 
   @Get()
-  verify(
+  async verify(
     @Query('hub.mode') mode: string,
     @Query('hub.verify_token') token: string,
     @Query('hub.challenge') challenge: string,
     @Res() response: Response,
   ) {
-    const result = this.whatsapp.verifySubscription(mode, token, challenge);
+    const result = await this.whatsapp.verifySubscription(mode, token, challenge);
     return response.status(200).type('text/plain').send(result);
   }
 
