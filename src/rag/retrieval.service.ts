@@ -3,22 +3,33 @@ import { ConfigService } from '../config/config.service';
 import { DatabaseService } from '../database/database.service';
 import { OpenAiService } from '../llm/openai.service';
 import { AnswerInput,Chunk } from './contracts';
+
 @Injectable()
 export class RetrievalService {
   constructor(private db:DatabaseService,private ai:OpenAiService,private config:ConfigService){}
+
   async search(x:AnswerInput,agencyId:string):Promise<Chunk[]>{
-    const [v]=await this.ai.embed([x.message]);const f=x.filters;
-    const r=await this.db.query<any>(`SELECT d.id document_id,d.title,d.category,d.language,d.metadata,c.content,(1-(c.embedding <=> $1::vector))::float similarity
-      FROM knowledge_chunks c JOIN knowledge_documents d ON d.id=c.document_id
-      WHERE d.agency_id=$9 AND d.is_active
-      AND ($2::text IS NULL OR d.category=$2)
-      AND ($3::text IS NULL OR lower(d.metadata->>'location')=lower($3))
-      AND ($4::text IS NULL OR lower(d.metadata->>'propertyType')=lower($4))
-      AND ($5::text IS NULL OR lower(d.metadata->>'purpose')=lower($5))
-      AND ($6::int IS NULL OR (d.metadata->>'bedrooms')::int=$6)
-      AND ($7::numeric IS NULL OR (d.metadata->>'price')::numeric<=$7)
-      ORDER BY c.embedding <=> $1::vector LIMIT $8`,
-      [`[${v.join(',')}]`,f.category??null,f.location??null,f.propertyType??null,f.purpose??null,f.bedrooms??null,f.maxPrice??null,this.config.get('RAG_TOP_K'),agencyId]);
+    const [v]=await this.ai.embed([x.message]);
+    const f=x.filters;
+    const metadataFilters:Record<string,unknown>={...(f.metadata||{})};
+    if(f.location)metadataFilters.location=f.location;
+    if(f.propertyType)metadataFilters.propertyType=f.propertyType;
+    if(f.purpose)metadataFilters.purpose=f.purpose;
+    if(f.bedrooms!==undefined)metadataFilters.bedrooms=f.bedrooms;
+    const r=await this.db.query<any>(`SELECT d.id AS document_id,d.title,d.category,d.language,d.metadata,c.content,
+        (1-(c.embedding <=> $1::vector))::float AS similarity
+      FROM knowledge_chunks c
+      JOIN knowledge_documents d ON d.id=c.document_id
+      WHERE d.agency_id=$6 AND d.is_active
+        AND ($2::text IS NULL OR d.category=$2)
+        AND ($3::jsonb='{}'::jsonb OR d.metadata @> $3::jsonb)
+        AND ($4::uuid IS NULL OR d.knowledge_base_id=$4)
+        AND ($5::numeric IS NULL OR CASE
+          WHEN d.metadata->>'price' ~ '^[0-9]+([.][0-9]+)?$' THEN (d.metadata->>'price')::numeric
+          ELSE NULL END <= $5::numeric)
+      ORDER BY c.embedding <=> $1::vector
+      LIMIT $7`,
+      [`[${v.join(',')}]`,f.category??null,JSON.stringify(metadataFilters),f.knowledgeBaseId??null,f.maxPrice??null,agencyId,this.config.get('RAG_TOP_K')]);
     return r.rows.map((a:any)=>({documentId:a.document_id,title:a.title,category:a.category,language:a.language,metadata:a.metadata,content:a.content,similarity:Number(a.similarity)}));
   }
 }

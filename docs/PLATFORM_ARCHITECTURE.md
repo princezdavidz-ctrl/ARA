@@ -18,12 +18,12 @@
 - Every company-owned query must be scoped by authenticated agency_id; never trust a tenant ID supplied by a browser.
 - Provider account identifiers resolve to a single active channel connection. Credentials are encrypted at rest and never returned by CRM/admin list APIs. Email and TikTok relay signatures are validated using the selected tenant connection's webhook secret.
 - Platform support uses a separate platform identity, least-privilege role, explicit reason, and platform audit entry.
-- Knowledge retrieval filters by tenant and knowledge base before ranking.
+- Knowledge retrieval filters by tenant and optional knowledge base before ranking; category and arbitrary JSON metadata filters are industry-neutral.
 - Webhook events are deduplicated per connection and provider event ID.
 
 ## Supervised response lifecycle
 received -> classified -> tenant knowledge retrieval -> policy/confidence checks -> approved send OR human escalation -> delivery status reconciliation.
-The model must not invent prices, availability, policies, or professional advice. Missing authoritative knowledge results in a clarifying question or escalation. Sensitive topics default to human review.
+The model must not invent prices, availability, policies, stock, schedules, qualifications, or contractual terms. Answers must cite retrieved tenant-owned evidence. Company industry and AI settings guide tone and policy but cannot override evidence or platform safety rules. Missing authoritative knowledge, disabled AI, draft-only response mode, confidence below the company threshold, invalid citations, or sensitive topics create a human escalation; AI drafts are not sent to customers until the response passes the tenant's configured send policy.
 
 ## Hybrid billing
 Each plan defines recurring price, included message/AI quotas, channel and seat limits, and overage unit prices. Usage events are immutable and idempotent. Invoice generation aggregates usage for a subscription period; payment status changes only from verified provider callbacks or reconciliation.
@@ -32,7 +32,7 @@ Each plan defines recurring price, included message/AI quotas, channel and seat 
 1. Platform foundation: tenant settings, platform-admin identity/audit, subscription/usage/channel schema.
 2. Tenant-safe domain services and role-guarded Super Admin APIs.
 3. Database-backed provider connections, encrypted credential lifecycle, webhook account resolution, and multi-connection workers (WhatsApp, Instagram, email, TikTok).
-4. Generalized knowledge bases and industry templates; supervised AI policy enforcement.
+4. Generalized tenant knowledge bases and industry templates; evidence-grounded AI policy enforcement and human escalation.
 5. Subscription lifecycle, invoice generation, payment integration, and usage enforcement.
 6. Separate Super Admin and Company CRM frontends.
 7. Tenant-isolation, webhook, billing, AI policy, load, and recovery tests.

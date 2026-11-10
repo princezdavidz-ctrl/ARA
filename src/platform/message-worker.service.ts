@@ -58,7 +58,9 @@ export class MessageWorker implements OnModuleInit, OnModuleDestroy {
     try {
       const result = await this.answers.answer({ message: job.body, preferredLanguage: 'auto', filters: {} } as AnswerInput, job.agencyId);
       await this.db.transaction(async client => {
-        await client.query("INSERT INTO messages(agency_id,conversation_id,direction,sender_type,body,subject,idempotency_key,delivery_status,processing_status) VALUES($1,$2,'outbound','ai',$3,$4,$5,'queued','not_applicable') ON CONFLICT(agency_id,idempotency_key) DO NOTHING", [job.agencyId, job.conversationId, result.answer, job.subject ? (job.subject.toLowerCase().startsWith('re:') ? job.subject : 'Re: ' + job.subject) : null, 'ai:' + job.id]);
+        if(result.status==='answered'){
+          await client.query("INSERT INTO messages(agency_id,conversation_id,direction,sender_type,body,subject,idempotency_key,delivery_status,processing_status) VALUES($1,$2,'outbound','ai',$3,$4,$5,'queued','not_applicable') ON CONFLICT(agency_id,idempotency_key) DO NOTHING", [job.agencyId, job.conversationId, result.answer, job.subject ? (job.subject.toLowerCase().startsWith('re:') ? job.subject : 'Re: ' + job.subject) : null, 'ai:' + job.id]);
+        }
         await client.query("UPDATE messages SET processing_status='completed',processing_started_at=NULL WHERE id=$1", [job.id]);
         await client.query("UPDATE conversations SET status=$3,updated_at=now() WHERE id=$1 AND agency_id=$2", [job.conversationId, job.agencyId, result.status === 'needs_human' ? 'pending' : 'open']);
         if (result.status === 'needs_human') {
