@@ -61,7 +61,7 @@ export class ChannelConnectionsService {
     if (!providers.includes(provider)||displayName.length<2||displayName.length>120||!externalAccountId||externalAccountId.length>255||(phone&&phone.length>255)) {
       throw new BadRequestException('Provide a supported provider, displayName, externalAccountId and valid optional externalPhoneNumberId');
     }
-    const encrypted=this.encrypt(credentials),keyVersion=String(process.env.ARA_CHANNEL_ENCRYPTION_KEY_VERSION||'v1').slice(0,32),verifyToken=credentials.webhookVerifyToken?createHash('sha256').update(credentials.webhookVerifyToken).digest('hex'):null;
+    const encrypted=this.encrypt(credentials),keyVersion=String(process.env.ARA_CHANNEL_ENCRYPTION_KEY_VERSION||'v1').slice(0,32),verifyToken=credentials.webhookVerifyToken?createHash('sha256').update(String(credentials.webhookVerifyToken)).digest('hex'):null;
     try {
       return await this.db.transaction(async client=>{
         const r=await client.query<ConnectionRow>('INSERT INTO channel_connections(agency_id,provider,display_name,external_account_id,external_phone_number_id,status,encrypted_credentials,credential_key_version,webhook_secret_hash,connected_by) VALUES($1,$2,$3,$4,$5,\'pending\',$6,$7,$8,$9) RETURNING '+this.projection(),
