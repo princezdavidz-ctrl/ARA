@@ -44,6 +44,7 @@ export class WhatsAppWebhookService {
         const connection = await this.vault.findByProviderAccount('whatsapp', String(entry?.id || ''), phoneNumberId);
         const agencyId = connection?.agencyId || (legacyAgencyId && legacyPhoneNumberId === phoneNumberId ? legacyAgencyId : undefined);
         if (!agencyId) continue;
+        const connectionId = connection?.id || null;
         const contacts = new Map<string, string>();
         for (const contact of value.contacts || []) {
           if (contact.wa_id) contacts.set(String(contact.wa_id), String(contact.profile?.name || ''));
@@ -60,16 +61,16 @@ export class WhatsAppWebhookService {
           const inserted = await this.db.transaction(async client => {
             const found = await client.query(
               `SELECT id FROM conversations
-               WHERE agency_id = $1 AND channel = 'whatsapp' AND customer_contact = $2 AND status <> 'closed'
+               WHERE agency_id = $1 AND channel = 'whatsapp' AND customer_contact = $2 AND channel_connection_id IS NOT DISTINCT FROM $3 AND status <> 'closed'
                ORDER BY updated_at DESC LIMIT 1 FOR UPDATE`,
-              [agencyId, from],
+              [agencyId, from, connectionId],
             );
             let conversationId = found.rows[0]?.id;
             if (!conversationId) {
               const created = await client.query(
-                `INSERT INTO conversations(agency_id, channel, customer_name, customer_contact)
-                 VALUES($1, 'whatsapp', $2, $3) RETURNING id`,
-                [agencyId, contacts.get(from) || null, from],
+                `INSERT INTO conversations(agency_id, channel, channel_connection_id, customer_name, customer_contact)
+                 VALUES($1, 'whatsapp', $2, $3, $4) RETURNING id`,
+                [agencyId, connectionId, contacts.get(from) || null, from],
               );
               conversationId = created.rows[0].id;
             }
