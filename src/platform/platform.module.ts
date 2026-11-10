@@ -14,5 +14,7 @@ import { ChannelConnectionsService } from './channel-connections.service';
 import { ChannelCredentialVault } from './channel-credential-vault.service';
 import { BillingController } from './billing.controller';
 import { BillingService } from './billing.service';
-@Module({ controllers: [PlatformController, LeadController, PlatformAdminController, ChannelConnectionsController, BillingController], providers: [PlatformService, LeadService, PlatformAdminService, ChannelConnectionsService, ChannelCredentialVault, BillingService, AuthGuard, PlatformAdminGuard, ConfigService, DatabaseService], exports: [AuthGuard, ChannelCredentialVault, BillingService] })
+import { AdminIntegrationsController } from './admin-integrations.controller';
+import { AdminIntegrationsService } from './admin-integrations.service';
+@Module({ controllers: [PlatformController, LeadController, PlatformAdminController, ChannelConnectionsController, BillingController, AdminIntegrationsController], providers: [PlatformService, LeadService, PlatformAdminService, ChannelConnectionsService, ChannelCredentialVault, BillingService, AdminIntegrationsService, AuthGuard, PlatformAdminGuard, ConfigService, DatabaseService], exports: [AuthGuard, ChannelCredentialVault, BillingService] })
 export class PlatformModule {}
