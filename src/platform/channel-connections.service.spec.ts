@@ -8,7 +8,7 @@ describe('ChannelConnectionsService', () => {
 
   it('rejects channel management by agents', async () => {
     const db:any={query:jest.fn(),transaction:jest.fn()};
-    const service=new ChannelConnectionsService(db);
+    const service=new ChannelConnectionsService(db,{} as any);
     await expect(service.create({...user,role:'agent'},{provider:'email'})).rejects.toBeInstanceOf(ForbiddenException);
     expect(db.transaction).not.toHaveBeenCalled();
   });
