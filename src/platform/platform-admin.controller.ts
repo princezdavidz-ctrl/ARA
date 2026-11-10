@@ -1,10 +1,12 @@
 import { Body, Controller, Get, Param, Post, Patch, Query, Req, UseGuards } from '@nestjs/common';
 import { PlatformAdminService } from './platform-admin.service';
 import { PlatformAdminGuard, PlatformAdmin } from './platform-admin.guard';
+import { AiUsageService } from './ai-usage.service';
 @Controller('admin')
 export class PlatformAdminController {
- constructor(private readonly adminService:PlatformAdminService){}
+ constructor(private readonly adminService:PlatformAdminService,private readonly aiUsage:AiUsageService){}
  @Post('auth/login') login(@Body() body:unknown){return this.adminService.login(body);}
+ @UseGuards(PlatformAdminGuard) @Get('ai-usage') aiUsageDashboard(@Req() req:{platformAdmin:PlatformAdmin},@Query('days') days?:string){return this.aiUsage.platformDashboard(req.platformAdmin,days);}
  @UseGuards(PlatformAdminGuard) @Get('overview') overview(@Req() req:{platformAdmin:PlatformAdmin}){return this.adminService.overview(req.platformAdmin);}
  @UseGuards(PlatformAdminGuard) @Get('companies') companies(@Req() req:{platformAdmin:PlatformAdmin},@Query() query:unknown){return this.adminService.companies(req.platformAdmin,query);}
  @UseGuards(PlatformAdminGuard) @Get('companies/:id') company(@Req() req:{platformAdmin:PlatformAdmin},@Param('id') id:string){return this.adminService.company(req.platformAdmin,id);}
