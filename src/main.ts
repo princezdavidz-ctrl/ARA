@@ -11,6 +11,8 @@ async function bootstrap() {
     'https://ara-dashboard-one.vercel.app',
     'https://ara-dashboard-princezdavidz-6985.vercel.app',
     ...(process.env.DASHBOARD_ORIGIN || '').split(',').map((origin) => origin.trim()).filter(Boolean),
+    ...(process.env.ARA_CRM_ORIGIN || '').split(',').map((origin) => origin.trim()).filter(Boolean),
+    ...(process.env.ARA_ADMIN_ORIGIN || '').split(',').map((origin) => origin.trim()).filter(Boolean),
   ]);
   app.enableCors({
     origin: (origin, callback) => {
