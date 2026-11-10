@@ -50,7 +50,7 @@ export class EmailWebhookService {
       }
       const inserted = await client.query(
         "INSERT INTO messages(agency_id,conversation_id,direction,sender_type,body,subject,idempotency_key,delivery_status,processing_status) VALUES($1,$2,'inbound','customer',$3,$4,$5,'stored','pending') ON CONFLICT(agency_id,idempotency_key) DO NOTHING RETURNING id",
-        [agencyId, conversationId, body, subject, 'email:' + messageId],
+        [agencyId, conversationId, body, subject, 'email:'+(connection?.id||'legacy')+':'+messageId],
       );
       if (inserted.rowCount) await client.query('UPDATE conversations SET updated_at=now() WHERE id=$1 AND agency_id=$2', [conversationId, agencyId]);
       return { accepted: Boolean(inserted.rowCount), conversationId };
