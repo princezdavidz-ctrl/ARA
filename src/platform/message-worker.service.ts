@@ -40,7 +40,7 @@ export class MessageWorker implements OnModuleInit, OnModuleDestroy {
   }
 
   private async claimInbound(): Promise<MessageJob | null> {
-    return this.db.transaction(async client => {
+    const job = await this.db.transaction(async client => {
       const result = await client.query<MessageJob>("SELECT m.id, m.agency_id AS \"agencyId\", m.conversation_id AS \"conversationId\", m.body, m.subject, m.processing_attempts AS attempts FROM messages m JOIN conversations cv ON cv.id=m.conversation_id AND cv.agency_id=m.agency_id WHERE m.direction='inbound' AND (m.processing_status='pending' OR (m.processing_status='processing' AND m.processing_started_at < now()-interval '5 minutes')) ORDER BY m.created_at LIMIT 1 FOR UPDATE OF m SKIP LOCKED");
       const job = result.rows[0];
       if (!job) return null;
@@ -52,6 +52,8 @@ export class MessageWorker implements OnModuleInit, OnModuleDestroy {
       await client.query("UPDATE messages SET processing_status='processing',processing_started_at=now(),processing_attempts=$2 WHERE id=$1", [job.id, attempts]);
       return { ...job, attempts };
     });
+    if(job) await this.recordUsage(job.agencyId,'message_in','message-in:'+job.id);
+    return job;
   }
 
   private async processInbound(job: MessageJob): Promise<void> {
@@ -60,6 +62,9 @@ export class MessageWorker implements OnModuleInit, OnModuleDestroy {
       await this.db.transaction(async client => {
         if(result.status==='answered'){
           await client.query("INSERT INTO messages(agency_id,conversation_id,direction,sender_type,body,subject,idempotency_key,delivery_status,processing_status) VALUES($1,$2,'outbound','ai',$3,$4,$5,'queued','not_applicable') ON CONFLICT(agency_id,idempotency_key) DO NOTHING", [job.agencyId, job.conversationId, result.answer, job.subject ? (job.subject.toLowerCase().startsWith('re:') ? job.subject : 'Re: ' + job.subject) : null, 'ai:' + job.id]);
+          await client.query("INSERT INTO usage_records(agency_id,subscription_id,metric,quantity,idempotency_key,metadata) VALUES($1,(SELECT id FROM company_subscriptions WHERE agency_id=$1 AND status IN ('active','trialing','past_due') AND current_period_start<=now() AND current_period_end>now() ORDER BY created_at DESC LIMIT 1),'ai_response',1,$2,'{}'::jsonb) ON CONFLICT(agency_id,idempotency_key) DO NOTHING",[job.agencyId,'ai-response:'+job.id]);
+        } else {
+          await client.query("INSERT INTO usage_records(agency_id,subscription_id,metric,quantity,idempotency_key,metadata) VALUES($1,(SELECT id FROM company_subscriptions WHERE agency_id=$1 AND status IN ('active','trialing','past_due') AND current_period_start<=now() AND current_period_end>now() ORDER BY created_at DESC LIMIT 1),'human_handoff',1,$2,'{}'::jsonb) ON CONFLICT(agency_id,idempotency_key) DO NOTHING",[job.agencyId,'human-handoff:'+job.id]);
         }
         await client.query("UPDATE messages SET processing_status='completed',processing_started_at=NULL WHERE id=$1", [job.id]);
         await client.query("UPDATE conversations SET status=$3,updated_at=now() WHERE id=$1 AND agency_id=$2", [job.conversationId, job.agencyId, result.status === 'needs_human' ? 'pending' : 'open']);
@@ -73,6 +78,12 @@ export class MessageWorker implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+
+  private async recordUsage(agencyId:string,metric:string,idempotencyKey:string):Promise<void>{
+    await this.db.query(`INSERT INTO usage_records(agency_id,subscription_id,metric,quantity,idempotency_key,metadata)
+      VALUES($1,(SELECT id FROM company_subscriptions WHERE agency_id=$1 AND status IN ('active','trialing','past_due') AND current_period_start<=now() AND current_period_end>now() ORDER BY created_at DESC LIMIT 1),$2,1,$3,'{}'::jsonb)
+      ON CONFLICT(agency_id,idempotency_key) DO NOTHING`,[agencyId,metric,idempotencyKey]);
+  }
 
   private async claimEmailDelivery(): Promise<EmailDeliveryJob | null> {
     return this.db.transaction(async client => {
@@ -106,7 +117,7 @@ export class MessageWorker implements OnModuleInit, OnModuleDestroy {
         const detail = payload.message || payload.name || 'Email provider returned HTTP ' + response.status;
         await this.failEmailDelivery(job, detail, response.status >= 400 && response.status < 500 && response.status !== 429); return;
       }
-      await this.db.query("UPDATE messages SET delivery_status='sent',provider_message_id=$2,delivery_started_at=NULL,delivery_next_attempt_at=NULL,delivery_error=NULL WHERE id=$1 AND delivery_status='sending'", [job.id, payload.id]);
+      await this.db.query("UPDATE messages SET delivery_status='sent',provider_message_id=$2,delivery_started_at=NULL,delivery_next_attempt_at=NULL,delivery_error=NULL WHERE id=$1 AND delivery_status='sending'", [job.id, payload.id]); await this.recordUsage(job.agencyId,'message_out','message-out:'+job.id);
     } catch (error) { await this.failEmailDelivery(job, error instanceof Error ? error.message : 'Unknown email delivery error', false); }
   }
 
@@ -145,7 +156,7 @@ export class MessageWorker implements OnModuleInit, OnModuleDestroy {
       const data=await response.json().catch(()=>({})) as {message_id?:string;id?:string;error?:{message?:string}};
       const id=data.message_id||data.id;
       if(!response.ok||!id){await this.failSocialDelivery(job,data.error?.message||'Instagram Graph API HTTP '+response.status,response.status>=400&&response.status<500&&response.status!==429);return;}
-      await this.db.query("UPDATE messages SET delivery_status='sent',provider_message_id=$2,delivery_started_at=NULL,delivery_next_attempt_at=NULL,delivery_error=NULL WHERE id=$1 AND delivery_status='sending'",[job.id,id]);
+      await this.db.query("UPDATE messages SET delivery_status='sent',provider_message_id=$2,delivery_started_at=NULL,delivery_next_attempt_at=NULL,delivery_error=NULL WHERE id=$1 AND delivery_status='sending'",[job.id,id]); await this.recordUsage(job.agencyId,'message_out','message-out:'+job.id);
     }catch(error){await this.failSocialDelivery(job,error instanceof Error?error.message:'Unknown Instagram delivery error',false);}
   }
   private async deliverTikTok(job:TikTokDeliveryJob):Promise<void>{
