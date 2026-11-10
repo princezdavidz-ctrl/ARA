@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
-import { createCipheriv, createHash, randomBytes } from 'node:crypto';
+import { createCipheriv, randomBytes } from 'node:crypto';
 import { DatabaseService } from '../database/database.service';
 import { AraUser } from './auth.guard';
 
@@ -62,10 +62,13 @@ export class ChannelConnectionsService {
     }
     const encrypted=this.encrypt(credentials),keyVersion=String(process.env.ARA_CHANNEL_ENCRYPTION_KEY_VERSION||'v1').slice(0,32);
     try {
-      const r=await this.db.query<ConnectionRow>('INSERT INTO channel_connections(agency_id,provider,display_name,external_account_id,external_phone_number_id,status,encrypted_credentials,credential_key_version,connected_by) VALUES($1,$2,$3,$4,$5,\'pending\',$6,$7,$8) RETURNING '+this.projection(),
-        [user.agencyId,provider,displayName,externalAccountId,phone,encrypted,keyVersion,user.id]);
-      await this.audit(user,'channel.connection_created',r.rows[0].id,{provider});
-      return {connection:r.rows[0],message:'Connection saved securely. Provider authorization and webhook verification are still required before activation.'};
+      return await this.db.transaction(async client=>{
+        const r=await client.query<ConnectionRow>('INSERT INTO channel_connections(agency_id,provider,display_name,external_account_id,external_phone_number_id,status,encrypted_credentials,credential_key_version,connected_by) VALUES($1,$2,$3,$4,$5,\'pending\',$6,$7,$8) RETURNING '+this.projection(),
+          [user.agencyId,provider,displayName,externalAccountId,phone,encrypted,keyVersion,user.id]);
+        await client.query('INSERT INTO audit_logs(agency_id,actor_user_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5,$6)',
+          [user.agencyId,user.id,'channel.connection_created','channel_connection',r.rows[0].id,JSON.stringify({provider})]);
+        return {connection:r.rows[0],message:'Connection saved securely. Provider authorization and webhook verification are still required before activation.'};
+      });
     } catch(e:any) { if(e.code==='23505') throw new ConflictException('This provider account is already connected to ARA'); throw e; }
   }
   async updateCredentials(user:AraUser,id:string,body:any) {
