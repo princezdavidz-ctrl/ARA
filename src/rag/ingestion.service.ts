@@ -52,7 +52,7 @@ export class IngestionService {
       :{rows:[] as {id:string;content_hash:string}[]};
     if(old.rows[0]?.content_hash===hash)return{documentId:old.rows[0].id,knowledgeBaseId,chunks:0,unchanged:true};
     const embedded=await this.ai.embedWithUsage(parts);
-    await this.embeddingUsage.record(agencyId,embedded,`embedding-ingestion:${agencyId}:${hash}`,{
+    await this.embeddingUsage.record(agencyId,embedded,`embedding-ingestion:${agencyId}:${knowledgeBaseId}:${hash}`,{
       operation:'document_ingestion',knowledgeBaseId,
     });
     const vectors=embedded.embeddings;
