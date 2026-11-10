@@ -35,6 +35,12 @@ const schema = z.object({
   TIKTOK_ACCESS_TOKEN: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
   TIKTOK_WEBHOOK_SECRET: z.preprocess(value => value === '' ? undefined : value, z.string().min(32).optional()),
   BILLING_WEBHOOK_SECRET: z.preprocess(value => value === '' ? undefined : value, z.string().min(32).optional()),
+  MPESA_ENV: z.enum(['sandbox','production']).default('sandbox'),
+  MPESA_CONSUMER_KEY: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
+  MPESA_CONSUMER_SECRET: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
+  MPESA_PASSKEY: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
+  MPESA_SHORT_CODE: z.preprocess(value => value === '' ? undefined : value, z.string().regex(/^\d+$/).optional()),
+  MPESA_CALLBACK_URL: z.preprocess(value => value === '' ? undefined : value, z.string().url().optional()),
   WHATSAPP_API_VERSION: z.string().regex(/^v\d+\.\d+$/).default('v27.0'),
 });
 export type Config = z.infer<typeof schema>;

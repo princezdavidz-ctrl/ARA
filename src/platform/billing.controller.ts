@@ -2,12 +2,13 @@ import { Body,Controller,Get,Param,Patch,Post,Query,Req,Res,UseGuards } from '@n
 import { RawBodyRequest } from '@nestjs/common';
 import { Request,Response } from 'express';
 import { BillingService } from './billing.service';
+import { MpesaService } from './mpesa.service';
 import { AuthGuard,AraUser } from './auth.guard';
 import { PlatformAdminGuard,PlatformAdmin } from './platform-admin.guard';
 
 @Controller()
 export class BillingController {
-  constructor(private readonly billing:BillingService){}
+  constructor(private readonly billing:BillingService,private readonly mpesa:MpesaService){}
 
   @UseGuards(PlatformAdminGuard) @Get('admin/billing/plans')
   listPlans(@Req() req:{platformAdmin:PlatformAdmin}){return this.billing.listPlans(req.platformAdmin);}
@@ -35,6 +36,17 @@ export class BillingController {
 
   @UseGuards(AuthGuard) @Post('platform/billing/cancel')
   requestCancellation(@Req() req:{user:AraUser}){return this.billing.requestCancellation(req.user);}
+
+  @UseGuards(AuthGuard) @Post('platform/billing/invoices/:id/mpesa')
+  initiateMpesa(@Req() req:{user:AraUser},@Param('id') id:string,@Body() body:{phoneNumber?:string}){
+    return this.mpesa.initiate(req.user,id,String(body?.phoneNumber||''));
+  }
+
+  @Post('webhooks/mpesa/stk')
+  async mpesaCallback(@Body() body:unknown,@Res() response:Response){
+    const result=await this.mpesa.callback(body);
+    return response.status(200).json(result);
+  }
 
   @Post('webhooks/billing/:provider')
   async paymentWebhook(@Param('provider') provider:string,@Req() request:RawBodyRequest<Request>,@Res() response:Response){
