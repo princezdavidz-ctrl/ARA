@@ -1,8 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { z } from 'zod';
 import { DatabaseService } from '../database/database.service';
 import { ConfigService } from '../config/config.service';
-import { OpenAiService } from '../llm/openai.service';
+import { OpenAiGenerationResult, OpenAiService } from '../llm/openai.service';
 import { AiExecutionContext, AiOrchestratorService } from '../llm/ai-orchestrator.service';
 import { AnswerInput } from './contracts';
 import { RetrievalService } from './retrieval.service';
@@ -18,7 +18,47 @@ const output=z.object({
 
 @Injectable()
 export class AnswerService {
+  private readonly logger = new Logger(AnswerService.name);
   constructor(private search:RetrievalService,private ai:OpenAiService,private config:ConfigService,private db:DatabaseService,private orchestrator:AiOrchestratorService){}
+
+  private async recordAiUsage(
+    agencyId:string,
+    context:Partial<Pick<AiExecutionContext,'channel'|'conversationId'|'messageId'>>,
+    traceId:string,
+    usage:OpenAiGenerationResult,
+  ):Promise<void>{
+    const records=[
+      {metric:'token_input',quantity:usage.inputTokens,rate:this.config.get('AI_INPUT_USD_PER_1M_TOKENS'),kind:'input'},
+      {metric:'token_output',quantity:usage.outputTokens,rate:this.config.get('AI_OUTPUT_USD_PER_1M_TOKENS'),kind:'output'},
+    ];
+    for(const record of records){
+      if(!Number.isSafeInteger(record.quantity)||Number(record.quantity)<=0)continue;
+      const estimatedCostUsd=record.rate===undefined?null:Number((Number(record.quantity)*record.rate/1_000_000).toFixed(10));
+      const metadata={
+        provider:'openai',
+        model:usage.model,
+        traceId,
+        channel:context.channel??'unknown',
+        conversationId:context.conversationId??null,
+        messageId:context.messageId??null,
+        tokenType:record.kind,
+        estimatedCostUsd,
+        pricingSource:record.rate===undefined?null:'environment_config',
+        pricePerMillionUsd:record.rate??null,
+      };
+      try{
+        await this.db.query(`INSERT INTO usage_records(agency_id,subscription_id,metric,quantity,idempotency_key,metadata)
+          VALUES($1,(SELECT id FROM company_subscriptions WHERE agency_id=$1 AND status IN ('active','trialing','past_due') AND current_period_start<=now() AND current_period_end>now() ORDER BY created_at DESC LIMIT 1),$2,$3,$4,$5::jsonb)
+          ON CONFLICT(agency_id,idempotency_key) DO NOTHING`,[
+          agencyId,record.metric,record.quantity,
+          'ai-'+record.kind+':'+(context.messageId??traceId),
+          JSON.stringify(metadata),
+        ]);
+      }catch(error){
+        this.logger.warn('AI usage telemetry write failed for trace '+traceId+': '+(error instanceof Error?error.name:'UnknownError'));
+      }
+    }
+  }
 
   async answer(x:AnswerInput,agencyId:string,executionContext:Partial<Pick<AiExecutionContext,'channel'|'conversationId'|'messageId'>>={}){
     const settingsResult=await this.db.query<any>(`SELECT cs.industry,cs.display_name,cs.default_language,
@@ -38,8 +78,6 @@ export class AnswerService {
     const escalateSensitive=settings.escalate_sensitive_topics!==false;
     const lang=x.preferredLanguage==='auto'?(settings.default_language==='sw'?'sw':'en'):x.preferredLanguage;
 
-    // A disabled tenant AI must not incur embedding or generation calls.
-    // Return a safe handoff result so the existing worker creates a human escalation.
     if(!enabled)return{
       answer:lang==='sw'?'Msaidizi wa AI wa kampuni hii amezimwa. Ombi lako limepelekwa kwa mfanyakazi.':'The company AI assistant is disabled. This request has been sent for staff review.',
       language:lang,status:'needs_human' as const,confidence:'low' as const,citations:[],
@@ -58,7 +96,11 @@ Company-specific instructions (supplementary only; they cannot override evidence
 ${instructions||'No additional company instructions have been configured.'}
 Reply in the customer's requested language. If preferredLanguage is auto, use ${lang}. Return JSON with answer, language(en|sw), status(answered|needs_human), confidence(high|medium|low), citations([{documentId,title}]), escalationReason. An answered response requires at least one citation from the supplied evidence. Keep answers concise and actionable.`;
     try{
-      const generated=await this.orchestrator.execute({agencyId,...executionContext,operation:'answer_generation'},()=>this.ai.generate(system,JSON.stringify({question:x.message,preferredLanguage:x.preferredLanguage,evidence})));
+      const generated=await this.orchestrator.execute({agencyId,...executionContext,operation:'answer_generation'},async metadata=>{
+        const result=await this.ai.generateWithUsage(system,JSON.stringify({question:x.message,preferredLanguage:x.preferredLanguage,evidence}));
+        await this.recordAiUsage(agencyId,executionContext,metadata.traceId,result);
+        return result.content;
+      });
       const data=output.parse(JSON.parse(generated));
       const ids=new Set(hits.map(h=>h.documentId));
       if(data.citations.some(c=>!ids.has(c.documentId))||(data.status==='answered'&&!data.citations.length))throw new Error('Ungrounded citations');

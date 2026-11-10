@@ -2,6 +2,7 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { z } from 'zod';
 
 const optionalSecret = z.preprocess(value => value === '' ? undefined : value, z.string().min(20).optional());
+const optionalRate = z.preprocess(value => value === '' || value === undefined ? undefined : value, z.coerce.number().min(0).optional());
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
@@ -11,6 +12,8 @@ const schema = z.object({
   OPENAI_MAX_RETRIES: z.coerce.number().int().min(0).max(3).default(1),
   OPENAI_CHAT_MODEL: z.string().default('gpt-4o-mini'),
   OPENAI_EMBEDDING_MODEL: z.string().default('text-embedding-3-small'),
+  AI_INPUT_USD_PER_1M_TOKENS: optionalRate,
+  AI_OUTPUT_USD_PER_1M_TOKENS: optionalRate,
   INGESTION_API_KEY: z.string().min(32),
   JWT_SECRET: z.string().min(32),
   ARA_CHANNEL_ENCRYPTION_KEY: z.preprocess(value => value === '' ? undefined : value, z.string().optional()),
