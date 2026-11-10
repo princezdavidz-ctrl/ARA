@@ -10,6 +10,7 @@ import { IngestionService } from './rag/ingestion.service';
 import { RetrievalService } from './rag/retrieval.service';
 import { EmbeddingUsageService } from './rag/embedding-usage.service';
 import { AnswerService } from './rag/answer.service';
+import { AiUsageQuotaService } from './rag/ai-usage-quota.service';
 import { PlatformModule } from './platform/platform.module';
 import { MessageWorker } from './platform/message-worker.service';
 import { WhatsAppWebhookController } from './platform/whatsapp-webhook.controller';
@@ -26,6 +27,6 @@ import { TikTokWebhookService } from './platform/tiktok-webhook.service';
 @Module({
   imports: [PlatformModule],
   controllers: [HealthController, KnowledgeController, AnswerController, WhatsAppWebhookController, EmailWebhookController, InstagramWebhookController, TikTokWebhookController, PropertyController, DashboardController],
-  providers: [ConfigService, DatabaseService, OpenAiService, AiOrchestratorService, IngestionService, RetrievalService, EmbeddingUsageService, AnswerService, MessageWorker, WhatsAppWebhookService, EmailWebhookService, InstagramWebhookService, TikTokWebhookService, PropertyService],
+  providers: [ConfigService, DatabaseService, OpenAiService, AiOrchestratorService, IngestionService, RetrievalService, EmbeddingUsageService, AiUsageQuotaService, AnswerService, MessageWorker, WhatsAppWebhookService, EmailWebhookService, InstagramWebhookService, TikTokWebhookService, PropertyService],
 })
 export class AppModule {}
