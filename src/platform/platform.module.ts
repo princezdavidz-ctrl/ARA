@@ -12,5 +12,5 @@ import { PlatformAdminGuard } from './platform-admin.guard';
 import { ChannelConnectionsController } from './channel-connections.controller';
 import { ChannelConnectionsService } from './channel-connections.service';
 import { ChannelCredentialVault } from './channel-credential-vault.service';
-@Module({ controllers: [PlatformController, LeadController, PlatformAdminController, ChannelConnectionsController], providers: [PlatformService, LeadService, PlatformAdminService, ChannelConnectionsService, ChannelCredentialVault, AuthGuard, PlatformAdminGuard, ConfigService, DatabaseService], exports: [AuthGuard] })
+@Module({ controllers: [PlatformController, LeadController, PlatformAdminController, ChannelConnectionsController], providers: [PlatformService, LeadService, PlatformAdminService, ChannelConnectionsService, ChannelCredentialVault, AuthGuard, PlatformAdminGuard, ConfigService, DatabaseService], exports: [AuthGuard, ChannelCredentialVault] })
 export class PlatformModule {}
