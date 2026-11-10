@@ -103,7 +103,7 @@ export class ChannelConnectionsService {
   }
   async updateCredentials(user:AraUser,id:string,body:any) {
     this.requireManager(user);
-    const credentials=this.safeCredentials(body?.credentials),encrypted=this.encrypt(credentials),keyVersion=String(process.env.ARA_CHANNEL_ENCRYPTION_KEY_VERSION||'v1').slice(0,32),verifyToken=credentials.webhookVerifyToken?createHash('sha256').update(credentials.webhookVerifyToken).digest('hex'):null;
+    const credentials=this.safeCredentials(body?.credentials),encrypted=this.encrypt(credentials),keyVersion=String(process.env.ARA_CHANNEL_ENCRYPTION_KEY_VERSION||'v1').slice(0,32),verifyToken=credentials.webhookVerifyToken?createHash('sha256').update(String(credentials.webhookVerifyToken)).digest('hex'):null;
     const r=await this.db.query<ConnectionRow>('UPDATE channel_connections SET encrypted_credentials=$3,credential_key_version=$4,webhook_secret_hash=$5,status=\'reauthorization_required\',last_error_code=NULL,updated_at=now() WHERE agency_id=$1 AND id=$2 RETURNING '+this.projection(),[user.agencyId,id,encrypted,keyVersion,verifyToken]);
     if(!r.rowCount) throw new NotFoundException('Channel connection not found');
     await this.audit(user,'channel.credentials_rotated',id,{});
