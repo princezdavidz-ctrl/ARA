@@ -36,6 +36,15 @@ export class AnswerService {
     const enabled=settings.enabled!==false;
     const escalateSensitive=settings.escalate_sensitive_topics!==false;
     const lang=x.preferredLanguage==='auto'?(settings.default_language==='sw'?'sw':'en'):x.preferredLanguage;
+
+    // A disabled tenant AI must not incur embedding or generation calls.
+    // Return a safe handoff result so the existing worker creates a human escalation.
+    if(!enabled)return{
+      answer:lang==='sw'?'Msaidizi wa AI wa kampuni hii amezimwa. Ombi lako limepelekwa kwa mfanyakazi.':'The company AI assistant is disabled. This request has been sent for staff review.',
+      language:lang,status:'needs_human' as const,confidence:'low' as const,citations:[],
+      escalationReason:'Company AI assistant is disabled.'
+    };
+
     const hits=(await this.search.search(x,agencyId)).filter(h=>h.similarity>=this.config.get('RAG_MIN_SIMILARITY'));
     if(!hits.length)return{
       answer:lang==='sw'?'Sina taarifa zilizothibitishwa za kutosha kujibu. Ombi hili linahitaji ukaguzi wa mfanyakazi.':'I do not have enough verified company information to answer accurately. This request needs a staff review.',
@@ -52,8 +61,8 @@ Reply in the customer's requested language. If preferredLanguage is auto, use ${
       const ids=new Set(hits.map(h=>h.documentId));
       if(data.citations.some(c=>!ids.has(c.documentId))||(data.status==='answered'&&!data.citations.length))throw new Error('Ungrounded citations');
       const confidenceScore=data.confidence==='high'?0.9:data.confidence==='medium'?0.72:0.3;
-      if(!enabled||responseMode==='draft_only'||(data.status==='answered'&&confidenceScore<threshold)){
-        return {...data,status:'needs_human' as const,escalationReason:!enabled?'Company AI assistant is disabled.':responseMode==='draft_only'?'Company response mode requires human approval.':'AI confidence is below the company threshold.'};
+      if(responseMode==='draft_only'||(data.status==='answered'&&confidenceScore<threshold)){
+        return {...data,status:'needs_human' as const,escalationReason:responseMode==='draft_only'?'Company response mode requires human approval.':'AI confidence is below the company threshold.'};
       }
       return data;
     }catch{
