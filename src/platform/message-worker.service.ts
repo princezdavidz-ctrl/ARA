@@ -41,7 +41,7 @@ export class MessageWorker implements OnModuleInit, OnModuleDestroy {
 
   private async claimInbound(): Promise<MessageJob | null> {
     const job = await this.db.transaction(async client => {
-      const result = await client.query<MessageJob>("SELECT m.id, m.agency_id AS \"agencyId\", m.conversation_id AS \"conversationId\", m.body, m.subject, m.processing_attempts AS attempts FROM messages m JOIN conversations cv ON cv.id=m.conversation_id AND cv.agency_id=m.agency_id WHERE m.direction='inbound' AND (m.processing_status='pending' OR (m.processing_status='processing' AND m.processing_started_at < now()-interval '5 minutes')) ORDER BY m.created_at LIMIT 1 FOR UPDATE OF m SKIP LOCKED");
+      const result = await client.query<MessageJob>("SELECT m.id, m.agency_id AS \"agencyId\", m.conversation_id AS \"conversationId\", cv.channel AS channel, m.body, m.subject, m.processing_attempts AS attempts FROM messages m JOIN conversations cv ON cv.id=m.conversation_id AND cv.agency_id=m.agency_id WHERE m.direction='inbound' AND (m.processing_status='pending' OR (m.processing_status='processing' AND m.processing_started_at < now()-interval '5 minutes')) ORDER BY m.created_at LIMIT 1 FOR UPDATE OF m SKIP LOCKED");
       const job = result.rows[0];
       if (!job) return null;
       const attempts = Number(job.attempts) + 1;
