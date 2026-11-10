@@ -9,5 +9,7 @@ import { LeadService } from './lead.service';
 import { PlatformAdminController } from './platform-admin.controller';
 import { PlatformAdminService } from './platform-admin.service';
 import { PlatformAdminGuard } from './platform-admin.guard';
-@Module({ controllers: [PlatformController, LeadController, PlatformAdminController], providers: [PlatformService, LeadService, PlatformAdminService, AuthGuard, PlatformAdminGuard, ConfigService, DatabaseService], exports: [AuthGuard] })
+import { ChannelConnectionsController } from './channel-connections.controller';
+import { ChannelConnectionsService } from './channel-connections.service';
+@Module({ controllers: [PlatformController, LeadController, PlatformAdminController, ChannelConnectionsController], providers: [PlatformService, LeadService, PlatformAdminService, ChannelConnectionsService, AuthGuard, PlatformAdminGuard, ConfigService, DatabaseService], exports: [AuthGuard] })
 export class PlatformModule {}
