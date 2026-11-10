@@ -31,15 +31,16 @@ export class InstagramWebhookService {
       const connection=await this.vault.findByProviderAccount('instagram',accountId);
       const agencyId=connection?.agencyId||(legacyAgencyId&&legacyAccountId===accountId?legacyAgencyId:undefined);
       if(!agencyId) continue;
+      const connectionId=connection?.id||null;
       for(const event of entry.messaging||[]){
         const sender=String(event?.sender?.id||''); const messageId=String(event?.message?.mid||'');
         if(!sender||!messageId||event?.message?.is_echo) continue;
         const text=String(event?.message?.text||'').trim();
         const body=text||'[Customer sent an Instagram attachment or unsupported message. Human review is required.]';
         const inserted=await this.db.transaction(async client=>{
-          const found=await client.query("SELECT id FROM conversations WHERE agency_id=$1 AND channel='instagram' AND customer_contact=$2 AND status<>'closed' ORDER BY updated_at DESC LIMIT 1 FOR UPDATE",[agencyId,sender]);
+          const found=await client.query("SELECT id FROM conversations WHERE agency_id=$1 AND channel='instagram' AND customer_contact=$2 AND channel_connection_id IS NOT DISTINCT FROM $3 AND status<>'closed' ORDER BY updated_at DESC LIMIT 1 FOR UPDATE",[agencyId,sender,connectionId]);
           let conversationId=found.rows[0]?.id;
-          if(!conversationId){const created=await client.query("INSERT INTO conversations(agency_id,channel,customer_name,customer_contact) VALUES($1,'instagram',$2,$3) RETURNING id",[agencyId,null,sender]);conversationId=created.rows[0].id;}
+          if(!conversationId){const created=await client.query("INSERT INTO conversations(agency_id,channel,channel_connection_id,customer_name,customer_contact) VALUES($1,'instagram',$2,$3,$4) RETURNING id",[agencyId,connectionId,null,sender]);conversationId=created.rows[0].id;}
           const isText=Boolean(text);
           const result=await client.query("INSERT INTO messages(agency_id,conversation_id,direction,sender_type,body,idempotency_key,delivery_status,processing_status) VALUES($1,$2,'inbound','customer',$3,$4,'stored',$5) ON CONFLICT(agency_id,idempotency_key) DO NOTHING RETURNING id",[agencyId,conversationId,body,'instagram:'+messageId,isText?'pending':'not_applicable']);
           if(result.rowCount){await client.query('UPDATE conversations SET updated_at=now() WHERE id=$1 AND agency_id=$2',[conversationId,agencyId]);if(!isText){await client.query("INSERT INTO escalations(agency_id,conversation_id,reason) SELECT $1,$2,$3 WHERE NOT EXISTS(SELECT 1 FROM escalations WHERE agency_id=$1 AND conversation_id=$2 AND status IN ('open','claimed'))",[agencyId,conversationId,'Instagram attachment requires human review']);await client.query("UPDATE conversations SET status='pending' WHERE id=$1 AND agency_id=$2",[conversationId,agencyId]);}}
