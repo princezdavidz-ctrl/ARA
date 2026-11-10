@@ -1,14 +1,14 @@
 # ARA — Autonomous Respond Agent
 
-NestJS + TypeScript backend for a Kenyan real-estate agency. Includes tenant-scoped RAG, agency accounts, team access, conversations and a PostgreSQL-backed inbound AI worker.
+NestJS + TypeScript backend for ARA, a multi-company AI communication platform. The existing agency workspace is the tenant foundation; the platform expansion adds separate platform administration, company-specific AI configuration, channel connections, and hybrid subscription metering.
 
 ## Setup
 1. Copy .env.example to .env; set OpenAI key, 32+ character ingestion key and JWT secret.
 2. Start PostgreSQL with docker compose up -d db.
-3. Apply SQL migrations 001_init.sql through 010_social_channels.sql in order.
+3. Apply SQL migrations 001_init.sql through 011_multi_company_platform.sql in numeric order. Migration 011 is additive and creates the multi-company platform data foundation; it does not by itself activate the new admin APIs, DB-backed provider routing, payment processing, or separate frontend applications.
 4. Run npm ci, npm run build, npm test, then npm run start:dev.
 
-## Property and lead management
+## Platform architecture\nThe approved architecture and implementation sequence are documented in [docs/PLATFORM_ARCHITECTURE.md](docs/PLATFORM_ARCHITECTURE.md). ARA uses shared AI infrastructure with isolated company knowledge and configuration, supervised replies, hybrid subscription plus usage billing, and separate Super Admin and Company CRM applications.\n\n## ARA Super Admin API (foundation)\nMigration 011 adds a separate platform-admin identity. To bootstrap the first Super Admin, apply migrations through 011, set `ARA_BOOTSTRAP_PLATFORM_ADMIN_EMAIL`, `ARA_BOOTSTRAP_PLATFORM_ADMIN_NAME`, and a unique `ARA_BOOTSTRAP_PLATFORM_ADMIN_PASSWORD` (minimum 16 characters) in the deployment secret manager, then start the API once. The bootstrap creates an administrator only when the platform-admin table is empty and removes the password variable from the process environment. Remove the bootstrap secret from the deployment configuration after successful initialization. Do not use a company CRM access token for these endpoints.\n\n- `POST /admin/auth/login` — platform administrator login.\n- `GET /admin/overview` — platform overview metrics.\n- `GET /admin/companies` — paginated/searchable company list (`limit`, `offset`, `q`).\n- `GET /admin/companies/:id` — company profile and subscription summary.\n- `POST /admin/companies` — create a company and its first owner in one transaction. Requires `companyName`, `industry`, `ownerFullName`, `ownerEmail`, and a temporary password (12+ characters).\n- `PATCH /admin/companies/:id/status` — activate/deactivate a company with an audited action.\n\nAll routes except login require a platform token in `Authorization: Bearer`. Company lifecycle mutations require the `super_admin` role. These endpoints are an initial API foundation; rate limiting, MFA, password reset, invitation delivery, and a production Super Admin web UI remain required before broad production access.\n\n## Property and lead management
 Authenticated agency users can manage tenant-scoped property inventory and lead pipelines through the /platform/properties and /platform/leads endpoints. Property records are indexed into the agency RAG knowledge base. Listing availability and pricing must be kept current by agency staff.
 
 ## Agency dashboard
