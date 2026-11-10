@@ -5,7 +5,7 @@ import { DatabaseService } from '../database/database.service';
 import { ConfigService } from '../config/config.service';
 import { OpenAiGenerationResult, OpenAiService } from '../llm/openai.service';
 import { AiExecutionContext, AiOrchestratorService } from '../llm/ai-orchestrator.service';
-import { AnswerInput } from './contracts';
+import { AnswerInput, Chunk } from './contracts';
 import { RetrievalService } from './retrieval.service';
 import { AiUsageQuotaService } from './ai-usage-quota.service';
 
@@ -93,7 +93,7 @@ export class AnswerService {
       language:lang,status:'needs_human' as const,confidence:'low' as const,citations:[],
       escalationReason:reservation.reason||'AI subscription usage limit reached.'
     };
-    let hits;
+    let hits:Chunk[];
     try{
       hits=(await this.search.search(x,agencyId,executionContext)).filter(h=>h.similarity>=this.config.get('RAG_MIN_SIMILARITY'));
     }catch(error){
