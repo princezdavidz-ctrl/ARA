@@ -31,6 +31,6 @@ describe('ChannelConnectionsService', () => {
 
   it('requires a configured 32-byte encryption key', async () => {
     const service=new ChannelConnectionsService({} as any);
-    await expect((service as any).encrypt({token:'x'})).toThrow(ServiceUnavailableException);
+    expect(() => (service as any).encrypt({token:'x'})).toThrow(ServiceUnavailableException);
   });
 });
