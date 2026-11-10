@@ -2,6 +2,13 @@ import { Injectable, OnModuleInit, ServiceUnavailableException } from '@nestjs/c
 import OpenAI from 'openai';
 import { ConfigService } from '../config/config.service';
 
+export interface OpenAiGenerationResult {
+  content: string;
+  model: string;
+  inputTokens?: number;
+  outputTokens?: number;
+}
+
 @Injectable()
 export class OpenAiService implements OnModuleInit {
   private client?: OpenAI;
@@ -24,11 +31,20 @@ export class OpenAiService implements OnModuleInit {
     });
     return response.data.sort((a, b) => a.index - b.index).map(item => item.embedding);
   }
-  async generate(system: string, user: string): Promise<string> {
+  async generateWithUsage(system: string, user: string): Promise<OpenAiGenerationResult> {
     const response = await this.requireClient().chat.completions.create({
       model: this.config.get('OPENAI_CHAT_MODEL'), temperature: 0, response_format: { type: 'json_object' },
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
     });
-    return response.choices[0]?.message.content ?? '{}';
+    return {
+      content: response.choices[0]?.message.content ?? '{}',
+      model: response.model || this.config.get('OPENAI_CHAT_MODEL'),
+      inputTokens: response.usage?.prompt_tokens,
+      outputTokens: response.usage?.completion_tokens,
+    };
+  }
+  async generate(system: string, user: string): Promise<string> {
+    const response = await this.generateWithUsage(system, user);
+    return response.content;
   }
 }
