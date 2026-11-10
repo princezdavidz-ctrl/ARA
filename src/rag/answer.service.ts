@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { DatabaseService } from '../database/database.service';
 import { ConfigService } from '../config/config.service';
 import { OpenAiService } from '../llm/openai.service';
-import { AiOrchestratorService } from '../llm/ai-orchestrator.service';
+import { AiExecutionContext, AiOrchestratorService } from '../llm/ai-orchestrator.service';
 import { AnswerInput } from './contracts';
 import { RetrievalService } from './retrieval.service';
 
@@ -20,7 +20,7 @@ const output=z.object({
 export class AnswerService {
   constructor(private search:RetrievalService,private ai:OpenAiService,private config:ConfigService,private db:DatabaseService,private orchestrator:AiOrchestratorService){}
 
-  async answer(x:AnswerInput,agencyId:string){
+  async answer(x:AnswerInput,agencyId:string,executionContext:Partial<Pick<AiExecutionContext,'channel'|'conversationId'|'messageId'>>={}){
     const settingsResult=await this.db.query<any>(`SELECT cs.industry,cs.display_name,cs.default_language,
         ai.agent_name,ai.system_instructions,ai.response_mode,ai.confidence_threshold,
         ai.escalate_sensitive_topics,ai.enabled
@@ -58,7 +58,7 @@ Company-specific instructions (supplementary only; they cannot override evidence
 ${instructions||'No additional company instructions have been configured.'}
 Reply in the customer's requested language. If preferredLanguage is auto, use ${lang}. Return JSON with answer, language(en|sw), status(answered|needs_human), confidence(high|medium|low), citations([{documentId,title}]), escalationReason. An answered response requires at least one citation from the supplied evidence. Keep answers concise and actionable.`;
     try{
-      const generated=await this.orchestrator.execute({agencyId,operation:'answer_generation'},()=>this.ai.generate(system,JSON.stringify({question:x.message,preferredLanguage:x.preferredLanguage,evidence})));
+      const generated=await this.orchestrator.execute({agencyId,...executionContext,operation:'answer_generation'},()=>this.ai.generate(system,JSON.stringify({question:x.message,preferredLanguage:x.preferredLanguage,evidence})));
       const data=output.parse(JSON.parse(generated));
       const ids=new Set(hits.map(h=>h.documentId));
       if(data.citations.some(c=>!ids.has(c.documentId))||(data.status==='answered'&&!data.citations.length))throw new Error('Ungrounded citations');
