@@ -1,5 +1,4 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
-import { createHash } from 'node:crypto';
 import { DatabaseService } from '../database/database.service';
 import { ConfigService } from '../config/config.service';
 
@@ -87,7 +86,7 @@ export class MpesaService {
         return {ResultCode:0,ResultDesc:'Accepted'};
       }
       const invoice=await client.query<any>('SELECT id,agency_id,total_minor,currency,subscription_id FROM billing_invoices WHERE id=$1 AND agency_id=$2 FOR UPDATE',[p.invoice_id,p.agency_id]);
-      if(!invoice.rowCount||invoice.rows[0].currency!=='KES'||BigInt(p.amount_minor)!==BigInt(invoice.rows[0].total_minor)||BigInt(paidAmount)*100n!==BigInt(p.amount_minor)||phone!==p.mpesa_phone||!receipt) {
+      if(!invoice.rowCount||invoice.rows[0].currency!=='KES'||BigInt(p.amount_minor)!==BigInt(invoice.rows[0].total_minor)||!Number.isSafeInteger(paidAmount)||BigInt(paidAmount)*100n!==BigInt(p.amount_minor)||phone!==p.mpesa_phone||!receipt) {
         await client.query(`UPDATE billing_payments SET status='failed',provider_payload=$2,updated_at=now() WHERE id=$1`,[p.id,JSON.stringify({resultCode:code,validation:'callback_mismatch'})]);
         return {ResultCode:0,ResultDesc:'Accepted'};
       }
