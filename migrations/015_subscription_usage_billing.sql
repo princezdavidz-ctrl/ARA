@@ -3,6 +3,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS billing_invoices_subscription_period_uq
   ON billing_invoices(subscription_id,period_start,period_end)
   WHERE subscription_id IS NOT NULL AND period_start IS NOT NULL AND period_end IS NOT NULL;
 
+CREATE UNIQUE INDEX IF NOT EXISTS billing_invoices_agency_id_uq ON billing_invoices(agency_id,id);
+
 CREATE TABLE IF NOT EXISTS billing_invoice_items (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   agency_id uuid NOT NULL REFERENCES agencies(id) ON DELETE CASCADE,
