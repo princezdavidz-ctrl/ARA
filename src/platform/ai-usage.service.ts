@@ -23,7 +23,6 @@ export class AiUsageService {
         COALESCE(sum(${COST_SQL}) FILTER(WHERE metric IN ('token_input','token_output')),0)::text AS "estimatedCostUsd",
         count(*) FILTER(WHERE metric IN ('token_input','token_output'))::int AS "usageEvents",
         count(*) FILTER(WHERE metric IN ('token_input','token_output') AND metadata->>'estimatedCostUsd' IS NULL)::int AS "unpricedEvents",
-        count(*) FILTER(WHERE metric IN ('token_input','token_output') AND metadata->>'estimatedCostUsd' IS NULL)::int AS "unpricedEvents",
         count(DISTINCT metadata->>'model') FILTER(WHERE metric IN ('token_input','token_output'))::int AS "modelsUsed"
         FROM usage_records WHERE agency_id=$1 AND occurred_at>=now()-($2::text||' days')::interval`,
         [user.agencyId, days]),
@@ -62,7 +61,8 @@ export class AiUsageService {
         COALESCE(sum(quantity) FILTER(WHERE metric='token_input'),0)::text AS "inputTokens",
         COALESCE(sum(quantity) FILTER(WHERE metric='token_output'),0)::text AS "outputTokens",
         COALESCE(sum(${COST_SQL}) FILTER(WHERE metric IN ('token_input','token_output')),0)::text AS "estimatedCostUsd",
-        count(*) FILTER(WHERE metric IN ('token_input','token_output'))::int AS "usageEvents"
+        count(*) FILTER(WHERE metric IN ('token_input','token_output'))::int AS "usageEvents",
+        count(*) FILTER(WHERE metric IN ('token_input','token_output') AND metadata->>'estimatedCostUsd' IS NULL)::int AS "unpricedEvents"
         FROM usage_records WHERE occurred_at>=now()-($1::text||' days')::interval`, [days]),
       this.db.query<any>(`SELECT a.id AS "agencyId",a.name AS "companyName",
         COALESCE(sum(u.quantity) FILTER(WHERE u.metric='token_input'),0)::text AS "inputTokens",
