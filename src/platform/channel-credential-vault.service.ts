@@ -46,7 +46,7 @@ export class ChannelCredentialVault {
   async findByVerifyToken(provider:ChannelProvider,token:string):Promise<ResolvedChannel|null>{
     const hash=createHash('sha256').update(token).digest('hex');
     const r=await this.db.query<any>(`SELECT id,agency_id AS "agencyId",provider,external_account_id AS "externalAccountId",external_phone_number_id AS "externalPhoneNumberId",encrypted_credentials,credential_key_version AS "keyVersion"
-      FROM channel_connections WHERE provider=$1 AND status IN ('pending','active') AND webhook_secret_hash=$2 ORDER BY updated_at DESC LIMIT 2`,[provider,hash]);
+      FROM channel_connections WHERE provider=$1 AND status IN ('pending','active','reauthorization_required') AND webhook_secret_hash=$2 ORDER BY updated_at DESC LIMIT 2`,[provider,hash]);
     if(r.rows.length>1) throw new ServiceUnavailableException('Webhook verification token maps to multiple channel connections');
     const row=r.rows[0];if(!row)return null;
     return {id:row.id,agencyId:row.agencyId,provider:row.provider,externalAccountId:row.externalAccountId,externalPhoneNumberId:row.externalPhoneNumberId,credentials:this.decrypt(row.encrypted_credentials,row.keyVersion),keyVersion:row.keyVersion};
