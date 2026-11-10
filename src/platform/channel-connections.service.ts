@@ -1,7 +1,8 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
-import { createCipheriv, randomBytes } from 'node:crypto';
+import { createCipheriv, createHash, randomBytes } from 'node:crypto';
 import { DatabaseService } from '../database/database.service';
 import { AraUser } from './auth.guard';
+import { ChannelCredentialVault } from './channel-credential-vault.service';
 
 type Provider = 'whatsapp'|'email'|'instagram'|'facebook_messenger'|'tiktok';
 const providers: Provider[] = ['whatsapp','email','instagram','facebook_messenger','tiktok'];
@@ -9,7 +10,7 @@ type ConnectionRow = { id:string; provider:Provider; displayName:string; externa
 
 @Injectable()
 export class ChannelConnectionsService {
-  constructor(private readonly db:DatabaseService) {}
+  constructor(private readonly db:DatabaseService,private readonly vault:ChannelCredentialVault) {}
 
   private requireManager(user:AraUser) {
     if (!['owner','admin'].includes(user.role)) throw new ForbiddenException('Only company owners and administrators can manage channel connections');
@@ -60,21 +61,50 @@ export class ChannelConnectionsService {
     if (!providers.includes(provider)||displayName.length<2||displayName.length>120||!externalAccountId||externalAccountId.length>255||(phone&&phone.length>255)) {
       throw new BadRequestException('Provide a supported provider, displayName, externalAccountId and valid optional externalPhoneNumberId');
     }
-    const encrypted=this.encrypt(credentials),keyVersion=String(process.env.ARA_CHANNEL_ENCRYPTION_KEY_VERSION||'v1').slice(0,32);
+    const encrypted=this.encrypt(credentials),keyVersion=String(process.env.ARA_CHANNEL_ENCRYPTION_KEY_VERSION||'v1').slice(0,32),verifyToken=credentials.webhookVerifyToken?createHash('sha256').update(String(credentials.webhookVerifyToken)).digest('hex'):null;
     try {
       return await this.db.transaction(async client=>{
-        const r=await client.query<ConnectionRow>('INSERT INTO channel_connections(agency_id,provider,display_name,external_account_id,external_phone_number_id,status,encrypted_credentials,credential_key_version,connected_by) VALUES($1,$2,$3,$4,$5,\'pending\',$6,$7,$8) RETURNING '+this.projection(),
-          [user.agencyId,provider,displayName,externalAccountId,phone,encrypted,keyVersion,user.id]);
+        const r=await client.query<ConnectionRow>('INSERT INTO channel_connections(agency_id,provider,display_name,external_account_id,external_phone_number_id,status,encrypted_credentials,credential_key_version,webhook_secret_hash,connected_by) VALUES($1,$2,$3,$4,$5,\'pending\',$6,$7,$8,$9) RETURNING '+this.projection(),
+          [user.agencyId,provider,displayName,externalAccountId,phone,encrypted,keyVersion,verifyToken,user.id]);
         await client.query('INSERT INTO audit_logs(agency_id,actor_user_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5,$6)',
           [user.agencyId,user.id,'channel.connection_created','channel_connection',r.rows[0].id,JSON.stringify({provider})]);
         return {connection:r.rows[0],message:'Connection saved securely. Provider authorization and webhook verification are still required before activation.'};
       });
     } catch(e:any) { if(e.code==='23505') throw new ConflictException('This provider account is already connected to ARA'); throw e; }
   }
+  async verifyAndActivate(user:AraUser,id:string) {
+    this.requireManager(user);
+    const connection=await this.vault.getForTenantConnection(user.agencyId,id);
+    if(!connection) throw new NotFoundException('Channel connection not found');
+    if(!['whatsapp','instagram'].includes(connection.provider)) throw new BadRequestException('Automated account verification is currently supported for WhatsApp and Instagram');
+    const token=connection.credentials.accessToken;
+    if(!token||!connection.credentials.webhookVerifyToken) throw new BadRequestException('Connection requires accessToken and webhookVerifyToken credentials');
+    if(!connection.webhookVerified) throw new BadRequestException('Complete the Meta webhook verification handshake before activating this connection');
+    const apiVersion=connection.provider==='whatsapp'?(process.env.WHATSAPP_API_VERSION||'v27.0'):(process.env.INSTAGRAM_API_VERSION||'v26.0');
+    const accountId=connection.provider==='whatsapp'?connection.externalPhoneNumberId:connection.externalAccountId;
+    if(!accountId) throw new BadRequestException('The provider account identifier is incomplete');
+    let response:Response;
+    try {
+      response=await fetch('https://graph.facebook.com/'+apiVersion+'/'+encodeURIComponent(accountId)+'?fields=id',{
+        headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(10000),
+      });
+    } catch { throw new ServiceUnavailableException('Meta account verification could not reach the provider'); }
+    const payload:any=await response.json().catch(()=>({}));
+    if(!response.ok||String(payload?.id||'')!==accountId) {
+      throw new BadRequestException('Meta could not verify this account token and account ID. Check token permissions and account identifiers.');
+    }
+    return this.db.transaction(async client=>{
+      const updated=await client.query<ConnectionRow>('UPDATE channel_connections SET status=\'active\',last_verified_at=now(),last_error_code=NULL,updated_at=now() WHERE agency_id=$1 AND id=$2 RETURNING '+this.projection(),[user.agencyId,id]);
+      if(!updated.rowCount) throw new NotFoundException('Channel connection not found');
+      await client.query('INSERT INTO audit_logs(agency_id,actor_user_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5,$6)',
+        [user.agencyId,user.id,'channel.connection_verified','channel_connection',id,JSON.stringify({provider:connection.provider})]);
+      return {connection:updated.rows[0],message:'Provider account token verified. The connection is active for inbound webhook routing.'};
+    });
+  }
   async updateCredentials(user:AraUser,id:string,body:any) {
     this.requireManager(user);
-    const credentials=this.safeCredentials(body?.credentials),encrypted=this.encrypt(credentials),keyVersion=String(process.env.ARA_CHANNEL_ENCRYPTION_KEY_VERSION||'v1').slice(0,32);
-    const r=await this.db.query<ConnectionRow>('UPDATE channel_connections SET encrypted_credentials=$3,credential_key_version=$4,status=\'reauthorization_required\',last_error_code=NULL,updated_at=now() WHERE agency_id=$1 AND id=$2 RETURNING '+this.projection(),[user.agencyId,id,encrypted,keyVersion]);
+    const credentials=this.safeCredentials(body?.credentials),encrypted=this.encrypt(credentials),keyVersion=String(process.env.ARA_CHANNEL_ENCRYPTION_KEY_VERSION||'v1').slice(0,32),verifyToken=credentials.webhookVerifyToken?createHash('sha256').update(String(credentials.webhookVerifyToken)).digest('hex'):null;
+    const r=await this.db.query<ConnectionRow>('UPDATE channel_connections SET encrypted_credentials=$3,credential_key_version=$4,webhook_secret_hash=$5,status=\'reauthorization_required\',last_error_code=NULL,updated_at=now() WHERE agency_id=$1 AND id=$2 RETURNING '+this.projection(),[user.agencyId,id,encrypted,keyVersion,verifyToken]);
     if(!r.rowCount) throw new NotFoundException('Channel connection not found');
     await this.audit(user,'channel.credentials_rotated',id,{});
     return {connection:r.rows[0]};

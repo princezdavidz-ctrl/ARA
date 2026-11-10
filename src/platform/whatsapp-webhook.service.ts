@@ -2,27 +2,27 @@ import { Injectable, ServiceUnavailableException, UnauthorizedException } from '
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { DatabaseService } from '../database/database.service';
 import { ConfigService } from '../config/config.service';
+import { ChannelCredentialVault } from './channel-credential-vault.service';
 
 @Injectable()
 export class WhatsAppWebhookService {
-  constructor(private readonly db: DatabaseService, private readonly config: ConfigService) {}
+  constructor(private readonly db: DatabaseService, private readonly config: ConfigService, private readonly vault: ChannelCredentialVault) {}
 
-  verifySubscription(mode: string, token: string, challenge: string): string {
-    const expected = this.config.get('WHATSAPP_VERIFY_TOKEN');
-    if (!expected) throw new ServiceUnavailableException('WhatsApp channel is not configured');
-    const a = Buffer.from(token || '');
-    const b = Buffer.from(expected);
-    if (mode !== 'subscribe' || a.length !== b.length || !timingSafeEqual(a, b) || !challenge) {
-      throw new UnauthorizedException('WhatsApp webhook verification failed');
-    }
+  async verifySubscription(mode: string, token: string, challenge: string): Promise<string> {
+    if(mode!=='subscribe'||!challenge) throw new UnauthorizedException('WhatsApp webhook verification failed');
+    const expected=this.config.get('WHATSAPP_VERIFY_TOKEN');
+    const a=Buffer.from(token||''),b=Buffer.from(expected||'');
+    const legacyValid=Boolean(expected&&a.length===b.length&&timingSafeEqual(a,b));
+    const tenantConnection=!legacyValid&&token?await this.vault.findByVerifyToken('whatsapp',token):null;
+    if(!legacyValid&&!tenantConnection) throw new UnauthorizedException('WhatsApp webhook verification failed');
     return challenge;
   }
 
   async receive(rawBody: Buffer | undefined, signature: string | undefined, payload: any): Promise<{ received: boolean; accepted: number }> {
     const appSecret = this.config.get('WHATSAPP_APP_SECRET');
-    const agencyId = this.config.get('WHATSAPP_AGENCY_ID');
-    const phoneNumberId = this.config.get('WHATSAPP_PHONE_NUMBER_ID');
-    if (!appSecret || !agencyId || !phoneNumberId) throw new ServiceUnavailableException('WhatsApp channel is not configured');
+    const legacyAgencyId = this.config.get('WHATSAPP_AGENCY_ID');
+    const legacyPhoneNumberId = this.config.get('WHATSAPP_PHONE_NUMBER_ID');
+    if (!appSecret) throw new ServiceUnavailableException('WhatsApp Meta app signature secret is not configured');
     if (!rawBody || !signature || !/^sha256=[a-f0-9]{64}$/i.test(signature)) {
       throw new UnauthorizedException('Missing or invalid webhook signature');
     }
@@ -39,7 +39,11 @@ export class WhatsAppWebhookService {
     for (const entry of payload.entry) {
       for (const change of entry?.changes || []) {
         const value = change?.value;
-        if (change?.field !== 'messages' || value?.metadata?.phone_number_id !== phoneNumberId) continue;
+        if (change?.field !== 'messages') continue;
+        const phoneNumberId = String(value?.metadata?.phone_number_id || '');
+        const connection = await this.vault.findByProviderAccount('whatsapp', String(entry?.id || ''), phoneNumberId);
+        const agencyId = connection?.agencyId || (legacyAgencyId && legacyPhoneNumberId === phoneNumberId ? legacyAgencyId : undefined);
+        if (!agencyId) continue;
         const contacts = new Map<string, string>();
         for (const contact of value.contacts || []) {
           if (contact.wa_id) contacts.set(String(contact.wa_id), String(contact.profile?.name || ''));

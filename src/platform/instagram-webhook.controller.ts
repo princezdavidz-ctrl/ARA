@@ -6,8 +6,8 @@ import { InstagramWebhookService } from './instagram-webhook.service';
 export class InstagramWebhookController {
   constructor(private readonly instagram: InstagramWebhookService) {}
   @Get()
-  verify(@Query('hub.mode') mode:string,@Query('hub.verify_token') token:string,@Query('hub.challenge') challenge:string,@Res() response:Response){
-    return response.status(200).type('text/plain').send(this.instagram.verifySubscription(mode,token,challenge));
+  async verify(@Query('hub.mode') mode:string,@Query('hub.verify_token') token:string,@Query('hub.challenge') challenge:string,@Res() response:Response){
+    return response.status(200).type('text/plain').send(await this.instagram.verifySubscription(mode,token,challenge));
   }
   @Post()
   async receive(@Req() request:RawBodyRequest<Request>,@Res() response:Response){
