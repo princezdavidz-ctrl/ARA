@@ -8,7 +8,11 @@ export class OpenAiService implements OnModuleInit {
   constructor(private config: ConfigService) {}
   onModuleInit(): void {
     const apiKey = this.config.get('OPENAI_API_KEY');
-    if (apiKey) this.client = new OpenAI({ apiKey });
+    if (apiKey) this.client = new OpenAI({
+      apiKey,
+      timeout: this.config.get('OPENAI_TIMEOUT_MS'),
+      maxRetries: this.config.get('OPENAI_MAX_RETRIES'),
+    });
   }
   private requireClient(): OpenAI {
     if (!this.client) throw new ServiceUnavailableException('AI is not configured yet. Add OPENAI_API_KEY to the deployment environment.');

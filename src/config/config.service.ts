@@ -7,6 +7,8 @@ const schema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   DATABASE_URL: z.string().url(),
   OPENAI_API_KEY: optionalSecret,
+  OPENAI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120000).default(30000),
+  OPENAI_MAX_RETRIES: z.coerce.number().int().min(0).max(3).default(1),
   OPENAI_CHAT_MODEL: z.string().default('gpt-4o-mini'),
   OPENAI_EMBEDDING_MODEL: z.string().default('text-embedding-3-small'),
   INGESTION_API_KEY: z.string().min(32),
