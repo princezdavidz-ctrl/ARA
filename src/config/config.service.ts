@@ -34,6 +34,7 @@ const schema = z.object({
   TIKTOK_BUSINESS_ID: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
   TIKTOK_ACCESS_TOKEN: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
   TIKTOK_WEBHOOK_SECRET: z.preprocess(value => value === '' ? undefined : value, z.string().min(32).optional()),
+  BILLING_WEBHOOK_SECRET: z.preprocess(value => value === '' ? undefined : value, z.string().min(32).optional()),
   WHATSAPP_API_VERSION: z.string().regex(/^v\d+\.\d+$/).default('v27.0'),
 });
 export type Config = z.infer<typeof schema>;

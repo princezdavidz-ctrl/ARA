@@ -26,7 +26,7 @@ received -> classified -> tenant knowledge retrieval -> policy/confidence checks
 The model must not invent prices, availability, policies, stock, schedules, qualifications, or contractual terms. Answers must cite retrieved tenant-owned evidence. Company industry and AI settings guide tone and policy but cannot override evidence or platform safety rules. Missing authoritative knowledge, disabled AI, draft-only response mode, confidence below the company threshold, invalid citations, or sensitive topics create a human escalation; AI drafts are not sent to customers until the response passes the tenant's configured send policy.
 
 ## Hybrid billing
-Each plan defines recurring price, included message/AI quotas, channel and seat limits, and overage unit prices. Usage events are immutable and idempotent. Invoice generation aggregates usage for a subscription period; payment status changes only from verified provider callbacks or reconciliation.
+Each plan defines recurring price, included message/AI quotas, channel and seat limits, and overage unit prices. Usage events are idempotent and linked to the active subscription period. Invoice generation creates a base subscription line plus message and AI overage lines. Payment status changes only from a provider-native-verified callback relayed through ARA's signed normalized event contract or explicit reconciliation. Company billing queries are always scoped to the authenticated agency; platform billing mutations require a billing-capable platform role.
 
 ## Delivery sequence
 1. Platform foundation: tenant settings, platform-admin identity/audit, subscription/usage/channel schema.
@@ -38,4 +38,4 @@ Each plan defines recurring price, included message/AI quotas, channel and seat 
 7. Tenant-isolation, webhook, billing, AI policy, load, and recovery tests.
 
 ## Migration note
-Apply migrations in numeric order. Migration 011 is additive and preserves current agency-based CRM APIs. It creates the data foundation only; application endpoints, provider OAuth flows, encryption-key provisioning, payment integrations, and frontend applications are subsequent work and are not production-ready merely because this schema exists.
+Apply migrations in numeric order through 015. Migration 011 is additive and preserves current agency-based CRM APIs. It creates the data foundation only; application endpoints, provider OAuth flows, encryption-key provisioning, payment integrations, and frontend applications are subsequent work and are not production-ready merely because this schema exists.
