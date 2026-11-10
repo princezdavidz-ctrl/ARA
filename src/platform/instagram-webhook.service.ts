@@ -8,11 +8,12 @@ import { ChannelCredentialVault } from './channel-credential-vault.service';
 export class InstagramWebhookService {
   constructor(private readonly db: DatabaseService, private readonly config: ConfigService, private readonly vault: ChannelCredentialVault) {}
   async verifySubscription(mode: string, token: string, challenge: string): Promise<string> {
+    if(mode!=='subscribe'||!challenge) throw new UnauthorizedException('Instagram webhook verification failed');
     const expected=this.config.get('INSTAGRAM_VERIFY_TOKEN');
-    const a=Buffer.from(token||''); const b=Buffer.from(expected||'');
+    const a=Buffer.from(token||''),b=Buffer.from(expected||'');
     const legacyValid=Boolean(expected&&a.length===b.length&&timingSafeEqual(a,b));
     const tenantConnection=!legacyValid&&token?await this.vault.findByVerifyToken('instagram',token):null;
-    if(mode!=='subscribe'||(!legacyValid&&!tenantConnection)||!challenge) throw new UnauthorizedException('Instagram webhook verification failed');
+    if(!legacyValid&&!tenantConnection) throw new UnauthorizedException('Instagram webhook verification failed');
     return challenge;
   }
   async receive(rawBody: Buffer|undefined, signature: string|undefined, payload: any) {
