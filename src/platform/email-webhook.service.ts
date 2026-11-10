@@ -2,15 +2,19 @@ import { Injectable, ServiceUnavailableException, UnauthorizedException } from '
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { DatabaseService } from '../database/database.service';
 import { ConfigService } from '../config/config.service';
+import { ChannelCredentialVault } from './channel-credential-vault.service';
 
 @Injectable()
 export class EmailWebhookService {
-  constructor(private readonly db: DatabaseService, private readonly config: ConfigService) {}
+  constructor(private readonly db: DatabaseService, private readonly config: ConfigService, private readonly vault: ChannelCredentialVault) {}
 
   async receive(rawBody: Buffer | undefined, timestamp: string | undefined, signature: string | undefined, payload: any) {
-    const secret = this.config.get('EMAIL_WEBHOOK_SECRET');
-    const agencyId = this.config.get('EMAIL_AGENCY_ID');
-    if (!secret || !agencyId) throw new ServiceUnavailableException('Email channel is not configured');
+    const recipientValue = payload?.to?.email || payload?.to?.[0]?.email || payload?.to?.[0] || payload?.to || payload?.recipient || payload?.delivered_to || '';
+    const recipient = String(recipientValue).trim().toLowerCase();
+    const connection = recipient ? await this.vault.findByProviderAccount('email', recipient) : null;
+    const secret = connection?.credentials.webhookSecret || (!connection ? this.config.get('EMAIL_WEBHOOK_SECRET') : undefined);
+    const agencyId = connection?.agencyId || (!connection ? this.config.get('EMAIL_AGENCY_ID') : undefined);
+    if (!secret || !agencyId) throw new ServiceUnavailableException('Email channel is not configured for this recipient');
     if (!rawBody || !timestamp || !signature || !/^\d{10}$/.test(timestamp) || !/^sha256=[a-f0-9]{64}$/i.test(signature)) {
       throw new UnauthorizedException('Missing or invalid email webhook signature');
     }
@@ -33,14 +37,14 @@ export class EmailWebhookService {
     }
     const result = await this.db.transaction(async client => {
       const found = await client.query(
-        "SELECT id FROM conversations WHERE agency_id=$1 AND channel='email' AND lower(customer_contact)=lower($2) AND status<>'closed' ORDER BY updated_at DESC LIMIT 1 FOR UPDATE",
-        [agencyId, from],
+        "SELECT id FROM conversations WHERE agency_id=$1 AND channel='email' AND channel_connection_id IS NOT DISTINCT FROM $2::uuid AND lower(customer_contact)=lower($3) AND status<>'closed' ORDER BY updated_at DESC LIMIT 1 FOR UPDATE",
+        [agencyId, connection?.id || null, from],
       );
       let conversationId = found.rows[0]?.id;
       if (!conversationId) {
         const created = await client.query(
-          "INSERT INTO conversations(agency_id,channel,customer_name,customer_contact) VALUES($1,'email',$2,$3) RETURNING id",
-          [agencyId, name || null, from],
+          "INSERT INTO conversations(agency_id,channel,channel_connection_id,customer_name,customer_contact) VALUES($1,'email',$2,$3,$4) RETURNING id",
+          [agencyId, connection?.id || null, name || null, from],
         );
         conversationId = created.rows[0].id;
       }
