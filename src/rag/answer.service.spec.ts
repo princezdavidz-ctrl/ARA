@@ -1,6 +1,7 @@
 import { AnswerService } from './answer.service';
 
 describe('AnswerService',()=>{
+  const orchestrator:any={execute:jest.fn((_context:any,operation:any)=>operation({traceId:'test-trace',startedAt:new Date(0).toISOString()}))};
   const agencyId='22222222-2222-4222-8222-222222222222';
   const documentId='33333333-3333-4333-8333-333333333333';
   const hit:any={documentId,title:'Verified company policy',category:'policies',language:'en',metadata:{},content:'The verified company policy is to respond within two business days.',similarity:0.92};
@@ -19,7 +20,7 @@ describe('AnswerService',()=>{
       escalate_sensitive_topics:true,enabled:true
     }]})};
     const config:any={get:jest.fn().mockReturnValue(0.3)};
-    const service=new AnswerService(search,ai,config,db);
+    const service=new AnswerService(search,ai,config,db,orchestrator);
     const result=await service.answer({message:'What is the response time?',preferredLanguage:'en',filters:{}} as any,agencyId);
     expect(result.status).toBe('needs_human');
     expect(result.escalationReason).toContain('human approval');
