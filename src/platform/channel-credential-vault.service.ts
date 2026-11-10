@@ -3,7 +3,7 @@ import { createDecipheriv, createHash } from 'node:crypto';
 import { DatabaseService } from '../database/database.service';
 
 export type ChannelProvider='whatsapp'|'email'|'instagram'|'facebook_messenger'|'tiktok';
-export type ResolvedChannel={id:string;agencyId:string;provider:ChannelProvider;externalAccountId:string;externalPhoneNumberId:string|null;credentials:Record<string,string>;keyVersion:string};
+export type ResolvedChannel={id:string;agencyId:string;provider:ChannelProvider;externalAccountId:string;externalPhoneNumberId:string|null;credentials:Record<string,string>;keyVersion:string;webhookVerified?:boolean};
 
 @Injectable()
 export class ChannelCredentialVault {
@@ -29,10 +29,10 @@ export class ChannelCredentialVault {
     } catch { throw new ServiceUnavailableException('Unable to decrypt channel credentials'); }
   }
   async getForTenantConnection(agencyId:string,id:string):Promise<ResolvedChannel|null>{
-    const r=await this.db.query<any>(`SELECT id,agency_id AS "agencyId",provider,external_account_id AS "externalAccountId",external_phone_number_id AS "externalPhoneNumberId",encrypted_credentials,credential_key_version AS "keyVersion"
+    const r=await this.db.query<any>(`SELECT id,agency_id AS "agencyId",provider,external_account_id AS "externalAccountId",external_phone_number_id AS "externalPhoneNumberId",encrypted_credentials,credential_key_version AS "keyVersion",webhook_verified_at IS NOT NULL AS "webhookVerified"
       FROM channel_connections WHERE agency_id=$1 AND id=$2 AND status IN ('pending','active','reauthorization_required') LIMIT 1`,[agencyId,id]);
     const row=r.rows[0];if(!row)return null;
-    return {id:row.id,agencyId:row.agencyId,provider:row.provider,externalAccountId:row.externalAccountId,externalPhoneNumberId:row.externalPhoneNumberId,credentials:this.decrypt(row.encrypted_credentials,row.keyVersion),keyVersion:row.keyVersion};
+    return {id:row.id,agencyId:row.agencyId,provider:row.provider,externalAccountId:row.externalAccountId,externalPhoneNumberId:row.externalPhoneNumberId,credentials:this.decrypt(row.encrypted_credentials,row.keyVersion),keyVersion:row.keyVersion,webhookVerified:Boolean(row.webhookVerified)};
   }
   async findByProviderAccount(provider:ChannelProvider,externalAccountId:string,externalPhoneNumberId?:string):Promise<ResolvedChannel|null>{
     const r=await this.db.query<any>(`SELECT id,agency_id AS "agencyId",provider,external_account_id AS "externalAccountId",external_phone_number_id AS "externalPhoneNumberId",encrypted_credentials,credential_key_version AS "keyVersion"
@@ -49,6 +49,7 @@ export class ChannelCredentialVault {
       FROM channel_connections WHERE provider=$1 AND status IN ('pending','active','reauthorization_required') AND webhook_secret_hash=$2 ORDER BY updated_at DESC LIMIT 2`,[provider,hash]);
     if(r.rows.length>1) throw new ServiceUnavailableException('Webhook verification token maps to multiple channel connections');
     const row=r.rows[0];if(!row)return null;
-    return {id:row.id,agencyId:row.agencyId,provider:row.provider,externalAccountId:row.externalAccountId,externalPhoneNumberId:row.externalPhoneNumberId,credentials:this.decrypt(row.encrypted_credentials,row.keyVersion),keyVersion:row.keyVersion};
+    await this.db.query('UPDATE channel_connections SET webhook_verified_at=now() WHERE id=$1 AND agency_id=$2',[row.id,row.agencyId]);
+    return {id:row.id,agencyId:row.agencyId,provider:row.provider,externalAccountId:row.externalAccountId,externalPhoneNumberId:row.externalPhoneNumberId,credentials:this.decrypt(row.encrypted_credentials,row.keyVersion),keyVersion:row.keyVersion,webhookVerified:true};
   }
 }
