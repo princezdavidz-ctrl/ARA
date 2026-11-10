@@ -63,7 +63,7 @@ export class ChannelConnectionsService {
     const encrypted=this.encrypt(credentials),keyVersion=String(process.env.ARA_CHANNEL_ENCRYPTION_KEY_VERSION||'v1').slice(0,32),verifyToken=credentials.webhookVerifyToken?createHash('sha256').update(credentials.webhookVerifyToken).digest('hex'):null;
     try {
       return await this.db.transaction(async client=>{
-        const r=await client.query<ConnectionRow>('INSERT INTO channel_connections(agency_id,provider,display_name,external_account_id,external_phone_number_id,status,encrypted_credentials,credential_key_version,connected_by) VALUES($1,$2,$3,$4,$5,\'pending\',$6,$7,$8) RETURNING '+this.projection(),
+        const r=await client.query<ConnectionRow>('INSERT INTO channel_connections(agency_id,provider,display_name,external_account_id,external_phone_number_id,status,encrypted_credentials,credential_key_version,webhook_secret_hash,connected_by) VALUES($1,$2,$3,$4,$5,\'pending\',$6,$7,$8,$9) RETURNING '+this.projection(),
           [user.agencyId,provider,displayName,externalAccountId,phone,encrypted,keyVersion,verifyToken,user.id]);
         await client.query('INSERT INTO audit_logs(agency_id,actor_user_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5,$6)',
           [user.agencyId,user.id,'channel.connection_created','channel_connection',r.rows[0].id,JSON.stringify({provider})]);
@@ -74,7 +74,7 @@ export class ChannelConnectionsService {
   async updateCredentials(user:AraUser,id:string,body:any) {
     this.requireManager(user);
     const credentials=this.safeCredentials(body?.credentials),encrypted=this.encrypt(credentials),keyVersion=String(process.env.ARA_CHANNEL_ENCRYPTION_KEY_VERSION||'v1').slice(0,32),verifyToken=credentials.webhookVerifyToken?createHash('sha256').update(credentials.webhookVerifyToken).digest('hex'):null;
-    const r=await this.db.query<ConnectionRow>('UPDATE channel_connections SET encrypted_credentials=$3,credential_key_version=$4,status=\'reauthorization_required\',last_error_code=NULL,updated_at=now() WHERE agency_id=$1 AND id=$2 RETURNING '+this.projection(),[user.agencyId,id,encrypted,keyVersion,verifyToken]);
+    const r=await this.db.query<ConnectionRow>('UPDATE channel_connections SET encrypted_credentials=$3,credential_key_version=$4,webhook_secret_hash=$5,status=\'reauthorization_required\',last_error_code=NULL,updated_at=now() WHERE agency_id=$1 AND id=$2 RETURNING '+this.projection(),[user.agencyId,id,encrypted,keyVersion,verifyToken]);
     if(!r.rowCount) throw new NotFoundException('Channel connection not found');
     await this.audit(user,'channel.credentials_rotated',id,{});
     return {connection:r.rows[0]};
