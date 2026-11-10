@@ -30,6 +30,8 @@ jobs:
         with:
           node-version: 20
       - run: npm install --no-audit --no-fund
+      - name: Validate frontend JavaScript syntax
+        run: node --check apps/company-crm/app.js && node --check apps/company-crm/config.js && node --check apps/super-admin/app.js && node --check apps/super-admin/config.js
       - name: Apply database migrations
         run: for migration in migrations/*.sql; do echo "Applying $migration"; psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"; done
       - name: Build
