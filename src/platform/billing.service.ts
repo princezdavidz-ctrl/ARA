@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { DatabaseService } from '../database/database.service';
 import { ConfigService } from '../config/config.service';
@@ -210,7 +210,8 @@ export class BillingService {
       const invoice=await client.query<any>('SELECT id,agency_id,status,currency,total_minor FROM billing_invoices WHERE id=$1 AND agency_id=$2 FOR UPDATE',[invoiceId,agencyId]);
       if(!invoice.rowCount)throw new NotFoundException('Invoice not found for payment event');
       if(invoice.rows[0].currency!==currency||BigInt(invoice.rows[0].total_minor)<BigInt(amount))throw new BadRequestException('Payment amount or currency does not match the invoice');
-      await client.query('INSERT INTO billing_payments(agency_id,invoice_id,provider,provider_payment_ref,status,amount_minor,currency,provider_payload) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(provider,provider_payment_ref) DO UPDATE SET status=EXCLUDED.status,amount_minor=EXCLUDED.amount_minor,currency=EXCLUDED.currency,provider_payload=EXCLUDED.provider_payload,updated_at=now()',[agencyId,invoiceId,normalizedProvider,paymentRef,status,amount,currency,JSON.stringify(payload)]);
+      const payment=await client.query('INSERT INTO billing_payments(agency_id,invoice_id,provider,provider_payment_ref,status,amount_minor,currency,provider_payload) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(provider,provider_payment_ref) DO UPDATE SET status=EXCLUDED.status,amount_minor=EXCLUDED.amount_minor,currency=EXCLUDED.currency,provider_payload=EXCLUDED.provider_payload,updated_at=now() WHERE billing_payments.agency_id=EXCLUDED.agency_id AND billing_payments.invoice_id=EXCLUDED.invoice_id RETURNING id',[agencyId,invoiceId,normalizedProvider,paymentRef,status,amount,currency,JSON.stringify(payload)]);
+      if(!payment.rowCount)throw new ConflictException('Provider payment reference is already linked to another invoice or company');
       const net=await client.query<any>("SELECT COALESCE(sum(CASE WHEN status='succeeded' THEN amount_minor WHEN status='refunded' THEN -amount_minor ELSE 0 END),0)::text AS amount FROM billing_payments WHERE invoice_id=$1 AND agency_id=$2",[invoiceId,agencyId]);
       const isPaid=BigInt(net.rows[0].amount||'0')>=BigInt(invoice.rows[0].total_minor);
       await client.query("UPDATE billing_invoices SET status=$3,paid_at=CASE WHEN $3='paid' THEN COALESCE(paid_at,now()) ELSE NULL END WHERE id=$1 AND agency_id=$2",[invoiceId,agencyId,isPaid?'paid':'open']);
