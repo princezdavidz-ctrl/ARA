@@ -80,9 +80,13 @@ export class MessageWorker implements OnModuleInit, OnModuleDestroy {
 
 
   private async recordUsage(agencyId:string,metric:string,idempotencyKey:string):Promise<void>{
-    await this.db.query(`INSERT INTO usage_records(agency_id,subscription_id,metric,quantity,idempotency_key,metadata)
-      VALUES($1,(SELECT id FROM company_subscriptions WHERE agency_id=$1 AND status IN ('active','trialing','past_due') AND current_period_start<=now() AND current_period_end>now() ORDER BY created_at DESC LIMIT 1),$2,1,$3,'{}'::jsonb)
-      ON CONFLICT(agency_id,idempotency_key) DO NOTHING`,[agencyId,metric,idempotencyKey]);
+    try{
+      await this.db.query(`INSERT INTO usage_records(agency_id,subscription_id,metric,quantity,idempotency_key,metadata)
+        VALUES($1,(SELECT id FROM company_subscriptions WHERE agency_id=$1 AND status IN ('active','trialing','past_due') AND current_period_start<=now() AND current_period_end>now() ORDER BY created_at DESC LIMIT 1),$2,1,$3,'{}'::jsonb)
+        ON CONFLICT(agency_id,idempotency_key) DO NOTHING`,[agencyId,metric,idempotencyKey]);
+    }catch(error){
+      this.logger.error('Usage metering failed for '+idempotencyKey,error instanceof Error?error.stack:undefined);
+    }
   }
 
   private async claimEmailDelivery(): Promise<EmailDeliveryJob | null> {
