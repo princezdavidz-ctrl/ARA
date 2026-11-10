@@ -84,7 +84,7 @@ export class AnswerService {
       escalationReason:'Company AI assistant is disabled.'
     };
 
-    const hits=(await this.search.search(x,agencyId)).filter(h=>h.similarity>=this.config.get('RAG_MIN_SIMILARITY'));
+    const hits=(await this.search.search(x,agencyId,executionContext)).filter(h=>h.similarity>=this.config.get('RAG_MIN_SIMILARITY'));
     if(!hits.length)return{
       answer:lang==='sw'?'Sina taarifa zilizothibitishwa za kutosha kujibu. Ombi hili linahitaji ukaguzi wa mfanyakazi.':'I do not have enough verified company information to answer accurately. This request needs a staff review.',
       language:lang,status:'needs_human',confidence:'low',citations:[],escalationReason:'No sufficiently relevant evidence retrieved.'

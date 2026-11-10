@@ -2,6 +2,12 @@ import { Injectable, OnModuleInit, ServiceUnavailableException } from '@nestjs/c
 import OpenAI from 'openai';
 import { ConfigService } from '../config/config.service';
 
+export interface OpenAiEmbeddingResult {
+  embeddings: number[][];
+  model: string;
+  inputTokens?: number;
+}
+
 export interface OpenAiGenerationResult {
   content: string;
   model: string;
@@ -25,11 +31,18 @@ export class OpenAiService implements OnModuleInit {
     if (!this.client) throw new ServiceUnavailableException('AI is not configured yet. Add OPENAI_API_KEY to the deployment environment.');
     return this.client;
   }
+  async embedWithUsage(texts: string[]): Promise<OpenAiEmbeddingResult> {
+    const model = this.config.get('OPENAI_EMBEDDING_MODEL');
+    const response = await this.requireClient().embeddings.create({ model, input: texts });
+    return {
+      embeddings: response.data.sort((a, b) => a.index - b.index).map(item => item.embedding),
+      model: response.model || model,
+      inputTokens: response.usage?.prompt_tokens,
+    };
+  }
   async embed(texts: string[]): Promise<number[][]> {
-    const response = await this.requireClient().embeddings.create({
-      model: this.config.get('OPENAI_EMBEDDING_MODEL'), input: texts,
-    });
-    return response.data.sort((a, b) => a.index - b.index).map(item => item.embedding);
+    const response = await this.embedWithUsage(texts);
+    return response.embeddings;
   }
   async generateWithUsage(system: string, user: string): Promise<OpenAiGenerationResult> {
     const response = await this.requireClient().chat.completions.create({

@@ -1,15 +1,22 @@
 import { Injectable } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { ConfigService } from '../config/config.service';
 import { DatabaseService } from '../database/database.service';
 import { OpenAiService } from '../llm/openai.service';
+import { EmbeddingUsageService } from './embedding-usage.service';
 import { AnswerInput,Chunk } from './contracts';
 
 @Injectable()
 export class RetrievalService {
-  constructor(private db:DatabaseService,private ai:OpenAiService,private config:ConfigService){}
+  constructor(private db:DatabaseService,private ai:OpenAiService,private config:ConfigService,private embeddingUsage:EmbeddingUsageService){}
 
-  async search(x:AnswerInput,agencyId:string):Promise<Chunk[]>{
-    const [v]=await this.ai.embed([x.message]);
+  async search(x:AnswerInput,agencyId:string,context:{channel?:string;conversationId?:string;messageId?:string}={}):Promise<Chunk[]>{
+    const embedded=await this.ai.embedWithUsage([x.message]);
+    await this.embeddingUsage.record(agencyId,embedded,`embedding-retrieval:${agencyId}:${context.messageId??randomUUID()}`,{
+      operation:'query_retrieval',channel:context.channel??'unknown',
+      conversationId:context.conversationId??null,messageId:context.messageId??null,
+    });
+    const [v]=embedded.embeddings;
     const f=x.filters;
     const metadataFilters:Record<string,unknown>={...(f.metadata||{})};
     if(f.location)metadataFilters.location=f.location;

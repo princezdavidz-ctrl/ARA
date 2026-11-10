@@ -14,6 +14,7 @@ const schema = z.object({
   OPENAI_EMBEDDING_MODEL: z.string().default('text-embedding-3-small'),
   AI_INPUT_USD_PER_1M_TOKENS: optionalRate,
   AI_OUTPUT_USD_PER_1M_TOKENS: optionalRate,
+  AI_EMBEDDING_INPUT_USD_PER_1M_TOKENS: optionalRate,
   INGESTION_API_KEY: z.string().min(32),
   JWT_SECRET: z.string().min(32),
   ARA_CHANNEL_ENCRYPTION_KEY: z.preprocess(value => value === '' ? undefined : value, z.string().optional()),
