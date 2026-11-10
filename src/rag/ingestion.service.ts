@@ -2,12 +2,13 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { DatabaseService } from '../database/database.service';
 import { OpenAiService } from '../llm/openai.service';
+import { EmbeddingUsageService } from './embedding-usage.service';
 import { KnowledgeInput } from './contracts';
 import { chunkText } from './text-chunker';
 
 @Injectable()
 export class IngestionService {
-  constructor(private db:DatabaseService,private ai:OpenAiService){}
+  constructor(private db:DatabaseService,private ai:OpenAiService,private embeddingUsage:EmbeddingUsageService){}
 
   private async resolveKnowledgeBase(agencyId:string,requestedId?:string):Promise<string>{
     if(requestedId){
@@ -50,7 +51,11 @@ export class IngestionService {
       ?await this.db.query<{id:string;content_hash:string}>('SELECT id,content_hash FROM knowledge_documents WHERE agency_id=$1 AND knowledge_base_id=$2 AND category=$3 AND source_ref=$4',[agencyId,knowledgeBaseId,x.category,x.sourceRef])
       :{rows:[] as {id:string;content_hash:string}[]};
     if(old.rows[0]?.content_hash===hash)return{documentId:old.rows[0].id,knowledgeBaseId,chunks:0,unchanged:true};
-    const vectors=await this.ai.embed(parts);
+    const embedded=await this.ai.embedWithUsage(parts);
+    await this.embeddingUsage.record(agencyId,embedded,`embedding-ingestion:${agencyId}:${hash}`,{
+      operation:'document_ingestion',knowledgeBaseId,
+    });
+    const vectors=embedded.embeddings;
     return this.db.transaction(async c=>{
       let id:string;
       if(old.rows[0]){
