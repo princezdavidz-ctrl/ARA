@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { createCipheriv, createHash, randomBytes } from 'node:crypto';
 import { DatabaseService } from '../database/database.service';
 import { AraUser } from './auth.guard';
+import { ChannelCredentialVault } from './channel-credential-vault.service';
 
 type Provider = 'whatsapp'|'email'|'instagram'|'facebook_messenger'|'tiktok';
 const providers: Provider[] = ['whatsapp','email','instagram','facebook_messenger','tiktok'];
@@ -9,7 +10,7 @@ type ConnectionRow = { id:string; provider:Provider; displayName:string; externa
 
 @Injectable()
 export class ChannelConnectionsService {
-  constructor(private readonly db:DatabaseService) {}
+  constructor(private readonly db:DatabaseService,private readonly vault:ChannelCredentialVault) {}
 
   private requireManager(user:AraUser) {
     if (!['owner','admin'].includes(user.role)) throw new ForbiddenException('Only company owners and administrators can manage channel connections');
@@ -70,6 +71,34 @@ export class ChannelConnectionsService {
         return {connection:r.rows[0],message:'Connection saved securely. Provider authorization and webhook verification are still required before activation.'};
       });
     } catch(e:any) { if(e.code==='23505') throw new ConflictException('This provider account is already connected to ARA'); throw e; }
+  }
+  async verifyAndActivate(user:AraUser,id:string) {
+    this.requireManager(user);
+    const connection=await this.vault.getForTenantConnection(user.agencyId,id);
+    if(!connection) throw new NotFoundException('Channel connection not found');
+    if(!['whatsapp','instagram'].includes(connection.provider)) throw new BadRequestException('Automated account verification is currently supported for WhatsApp and Instagram');
+    const token=connection.credentials.accessToken;
+    if(!token||!connection.credentials.webhookVerifyToken) throw new BadRequestException('Connection requires accessToken and webhookVerifyToken credentials');
+    const apiVersion=connection.provider==='whatsapp'?(process.env.WHATSAPP_API_VERSION||'v27.0'):(process.env.INSTAGRAM_API_VERSION||'v26.0');
+    const accountId=connection.provider==='whatsapp'?connection.externalPhoneNumberId:connection.externalAccountId;
+    if(!accountId) throw new BadRequestException('The provider account identifier is incomplete');
+    let response:Response;
+    try {
+      response=await fetch('https://graph.facebook.com/'+apiVersion+'/'+encodeURIComponent(accountId)+'?fields=id',{
+        headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(10000),
+      });
+    } catch { throw new ServiceUnavailableException('Meta account verification could not reach the provider'); }
+    const payload:any=await response.json().catch(()=>({}));
+    if(!response.ok||String(payload?.id||'')!==accountId) {
+      throw new BadRequestException('Meta could not verify this account token and account ID. Check token permissions and account identifiers.');
+    }
+    return this.db.transaction(async client=>{
+      const updated=await client.query<ConnectionRow>('UPDATE channel_connections SET status=\'active\',last_verified_at=now(),last_error_code=NULL,updated_at=now() WHERE agency_id=$1 AND id=$2 RETURNING '+this.projection(),[user.agencyId,id]);
+      if(!updated.rowCount) throw new NotFoundException('Channel connection not found');
+      await client.query('INSERT INTO audit_logs(agency_id,actor_user_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5,$6)',
+        [user.agencyId,user.id,'channel.connection_verified','channel_connection',id,JSON.stringify({provider:connection.provider})]);
+      return {connection:updated.rows[0],message:'Provider account token verified. The connection is active for inbound webhook routing.'};
+    });
   }
   async updateCredentials(user:AraUser,id:string,body:any) {
     this.requireManager(user);
