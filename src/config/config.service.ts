@@ -46,15 +46,15 @@ export class ConfigService implements OnModuleInit {
     if (!parsed.success) throw new Error(parsed.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join('; '));
     const wa = parsed.data;
     if (wa.ARA_CHANNEL_ENCRYPTION_KEY) { const k=wa.ARA_CHANNEL_ENCRYPTION_KEY; const validHex=/^[0-9a-f]{64}$/i.test(k); let validBase64=false; try { validBase64=Buffer.from(k,'base64').length===32; } catch {} if (!validHex&&!validBase64) throw new Error('ARA_CHANNEL_ENCRYPTION_KEY must encode exactly 32 bytes (64 hex characters or base64).'); }
-    const inboundConfigured = Boolean(wa.WHATSAPP_VERIFY_TOKEN || wa.WHATSAPP_APP_SECRET);
-    if (inboundConfigured && !(wa.WHATSAPP_AGENCY_ID && wa.WHATSAPP_PHONE_NUMBER_ID && wa.WHATSAPP_VERIFY_TOKEN && wa.WHATSAPP_APP_SECRET)) {
-      throw new Error('Inbound WhatsApp webhooks require WHATSAPP_AGENCY_ID, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_VERIFY_TOKEN and WHATSAPP_APP_SECRET.');
+    const legacyWhatsAppConfigured = Boolean(wa.WHATSAPP_AGENCY_ID || wa.WHATSAPP_PHONE_NUMBER_ID || wa.WHATSAPP_VERIFY_TOKEN);
+    if (legacyWhatsAppConfigured && !(wa.WHATSAPP_AGENCY_ID && wa.WHATSAPP_PHONE_NUMBER_ID && wa.WHATSAPP_VERIFY_TOKEN && wa.WHATSAPP_APP_SECRET)) {
+      throw new Error('Legacy single-tenant WhatsApp configuration requires WHATSAPP_AGENCY_ID, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_VERIFY_TOKEN and WHATSAPP_APP_SECRET together.');
     }
     if (wa.WHATSAPP_ACCESS_TOKEN && !(wa.WHATSAPP_AGENCY_ID && wa.WHATSAPP_PHONE_NUMBER_ID)) throw new Error('Outbound WhatsApp delivery requires WHATSAPP_AGENCY_ID and WHATSAPP_PHONE_NUMBER_ID.');
     const emailAny = Boolean(wa.EMAIL_AGENCY_ID || wa.EMAIL_RESEND_API_KEY || wa.EMAIL_FROM_ADDRESS || wa.EMAIL_WEBHOOK_SECRET);
     if (emailAny && !(wa.EMAIL_AGENCY_ID && wa.EMAIL_RESEND_API_KEY && wa.EMAIL_FROM_ADDRESS && wa.EMAIL_WEBHOOK_SECRET)) throw new Error('Email channel requires EMAIL_AGENCY_ID, EMAIL_RESEND_API_KEY, EMAIL_FROM_ADDRESS and EMAIL_WEBHOOK_SECRET together.');
-    const igAny = Boolean(wa.INSTAGRAM_AGENCY_ID || wa.INSTAGRAM_ACCOUNT_ID || wa.INSTAGRAM_ACCESS_TOKEN || wa.INSTAGRAM_APP_SECRET || wa.INSTAGRAM_VERIFY_TOKEN);
-    if (igAny && !(wa.INSTAGRAM_AGENCY_ID && wa.INSTAGRAM_ACCOUNT_ID && wa.INSTAGRAM_ACCESS_TOKEN && wa.INSTAGRAM_APP_SECRET && wa.INSTAGRAM_VERIFY_TOKEN)) throw new Error('Instagram requires INSTAGRAM_AGENCY_ID, INSTAGRAM_ACCOUNT_ID, INSTAGRAM_ACCESS_TOKEN, INSTAGRAM_APP_SECRET and INSTAGRAM_VERIFY_TOKEN together.');
+    const legacyInstagramConfigured = Boolean(wa.INSTAGRAM_AGENCY_ID || wa.INSTAGRAM_ACCOUNT_ID || wa.INSTAGRAM_ACCESS_TOKEN || wa.INSTAGRAM_VERIFY_TOKEN);
+    if (legacyInstagramConfigured && !(wa.INSTAGRAM_AGENCY_ID && wa.INSTAGRAM_ACCOUNT_ID && wa.INSTAGRAM_ACCESS_TOKEN && wa.INSTAGRAM_APP_SECRET && wa.INSTAGRAM_VERIFY_TOKEN)) throw new Error('Legacy single-tenant Instagram configuration requires INSTAGRAM_AGENCY_ID, INSTAGRAM_ACCOUNT_ID, INSTAGRAM_ACCESS_TOKEN, INSTAGRAM_APP_SECRET and INSTAGRAM_VERIFY_TOKEN together.');
     const ttAny = Boolean(wa.TIKTOK_AGENCY_ID || wa.TIKTOK_BUSINESS_ID || wa.TIKTOK_ACCESS_TOKEN || wa.TIKTOK_WEBHOOK_SECRET);
     if (ttAny && !(wa.TIKTOK_AGENCY_ID && wa.TIKTOK_BUSINESS_ID && wa.TIKTOK_ACCESS_TOKEN && wa.TIKTOK_WEBHOOK_SECRET)) throw new Error('TikTok requires TIKTOK_AGENCY_ID, TIKTOK_BUSINESS_ID, TIKTOK_ACCESS_TOKEN and TIKTOK_WEBHOOK_SECRET together.');
     this.value = wa;
