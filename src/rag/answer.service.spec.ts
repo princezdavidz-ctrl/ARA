@@ -35,7 +35,7 @@ describe('AnswerService',()=>{
       industry:'general',default_language:'en',enabled:false
     }]})};
     const config:any={get:jest.fn().mockReturnValue(0.3)};
-    const service=new AnswerService(search,ai,config,db);
+    const service=new AnswerService(search,ai,config,db,orchestrator);
     const result=await service.answer({message:'Can you help me?',preferredLanguage:'auto',filters:{}} as any,agencyId);
 
     expect(result.status).toBe('needs_human');
@@ -50,7 +50,7 @@ describe('AnswerService',()=>{
     const ai:any={generate:jest.fn()};
     const db:any={query:jest.fn().mockResolvedValue({rows:[{industry:'general',default_language:'sw'}]})};
     const config:any={get:jest.fn().mockReturnValue(0.3)};
-    const service=new AnswerService(search,ai,config,db);
+    const service=new AnswerService(search,ai,config,db,orchestrator);
     const result=await service.answer({message:'Nina swali',preferredLanguage:'auto',filters:{}} as any,agencyId);
     expect(result.status).toBe('needs_human');
     expect(result.language).toBe('sw');
