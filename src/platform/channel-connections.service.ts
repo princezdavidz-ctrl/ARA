@@ -55,12 +55,14 @@ export class ChannelConnectionsService {
     this.requireManager(user);
     const provider=String(body?.provider||'') as Provider;
     const displayName=String(body?.displayName||'').trim();
-    const externalAccountId=String(body?.externalAccountId||'').trim();
+    let externalAccountId=String(body?.externalAccountId||'').trim();
+    if(provider==='email') externalAccountId=externalAccountId.toLowerCase();
     const phone=body?.externalPhoneNumberId==null?null:String(body.externalPhoneNumberId).trim();
     const credentials=this.safeCredentials(body?.credentials);
     if (!providers.includes(provider)||displayName.length<2||displayName.length>120||!externalAccountId||externalAccountId.length>255||(phone&&phone.length>255)) {
       throw new BadRequestException('Provide a supported provider, displayName, externalAccountId and valid optional externalPhoneNumberId');
     }
+    if(provider==='email'&&!/^\S+@\S+\.\S+$/.test(externalAccountId)) throw new BadRequestException('Email externalAccountId must be the receiving mailbox address');
     const encrypted=this.encrypt(credentials),keyVersion=String(process.env.ARA_CHANNEL_ENCRYPTION_KEY_VERSION||'v1').slice(0,32),verifyToken=credentials.webhookVerifyToken?createHash('sha256').update(String(credentials.webhookVerifyToken)).digest('hex'):null;
     try {
       return await this.db.transaction(async client=>{
