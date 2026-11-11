@@ -48,7 +48,7 @@ export class AnswerService {
         tokenType:record.kind,
         estimatedCostUsd,
         pricingSource:provider!=='openai'||record.rate===undefined?null:'environment_config',
-        pricePerMillionUsd:record.rate??null,
+        pricePerMillionUsd:provider!=='openai'?null:(record.rate??null),
       };
       try{
         await this.db.query(`INSERT INTO usage_records(agency_id,subscription_id,metric,quantity,idempotency_key,metadata)
