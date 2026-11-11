@@ -43,7 +43,7 @@ export class AiUsageQuotaService {
       const included = BigInt(sub.includedAiResponses || 0);
       const overagePrice = BigInt(sub.overageAiPriceMinor || 0);
       if (used >= included && overagePrice <= 0n) {
-        return { allowed: false, reason: 'The AI response allowance for this subscription period has been reached.' };
+        return { allowed: false, reason: 'The AI response allowance for this subscription period has been reached.', subscriptionId: sub.id };
       }
 
       await client.query(`INSERT INTO ai_usage_reservations(agency_id,subscription_id,idempotency_key,status,expires_at)
