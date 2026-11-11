@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
+import { recordBlockedSubscriptionAction } from '../platform/blocked-subscription-action';
 
 export type AiQuotaReservation = { allowed: boolean; reason?: string; subscriptionId?: string };
 
@@ -8,7 +9,7 @@ export class AiUsageQuotaService {
   constructor(private readonly db: DatabaseService) {}
 
   async reserve(agencyId: string, idempotencyKey: string): Promise<AiQuotaReservation> {
-    return this.db.transaction(async client => {
+    const outcome = await this.db.transaction(async client => {
       const subscription = await client.query<any>(`SELECT cs.id,cs.status,cs.current_period_start AS "periodStart",
           cs.current_period_end AS "periodEnd",p.included_ai_responses AS "includedAiResponses",
           p.overage_ai_price_minor AS "overageAiPriceMinor"
@@ -52,6 +53,8 @@ export class AiUsageQuotaService {
         [agencyId, sub.id, idempotencyKey]);
       return { allowed: true, subscriptionId: sub.id };
     });
+    if (!outcome.allowed) await recordBlockedSubscriptionAction(this.db, agencyId, 'ai_response', outcome.reason || 'AI response quota denied.', outcome.subscriptionId);
+    return outcome;
   }
 
   async consume(agencyId: string, idempotencyKey: string): Promise<void> {
