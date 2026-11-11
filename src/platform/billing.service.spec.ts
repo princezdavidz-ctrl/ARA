@@ -54,4 +54,42 @@ describe('BillingService',()=>{
     expect(db.transaction).not.toHaveBeenCalled();
   });
 
+  it('returns tenant quota balances and estimated overage charges for the platform dashboard',async()=>{
+    const row:any={agencyId,companyName:'Example Co',subscriptionId,planName:'Growth',status:'active',currency:'KES',
+      includedMessages:100,includedAiResponses:30,maxSeats:5,maxChannels:3,
+      overageMessagePriceMinor:'5',overageAiPriceMinor:'10',messages:'120',aiResponses:'35',
+      activeSeats:4,activeChannels:2,reservedMessages:'2'};
+    const db:any={query:jest.fn().mockResolvedValue({rows:[row],rowCount:1})};
+    const service=new BillingService(db,{get:jest.fn()} as any);
+    const result=await service.platformUsageSummary(admin);
+    expect(result.tenantCount).toBe(1);
+    expect(result.items[0].messageRemaining).toBe('0');
+    expect(result.items[0].aiRemaining).toBe('0');
+    expect(result.items[0].messageOverage).toBe('20');
+    expect(result.items[0].aiOverage).toBe('5');
+    expect(result.items[0].estimatedOverageMinor).toBe('150');
+    expect(db.query).toHaveBeenCalledTimes(1);
+  });
+
+  it('includes reserved messages when calculating remaining tenant allowance',async()=>{
+    const current:any={id:subscriptionId,status:'active',currency:'KES',currentPeriodStart:periodStart,currentPeriodEnd:periodEnd,
+      planName:'Growth',includedMessages:100,includedAiResponses:30,maxSeats:5,maxChannels:3,
+      overageMessagePriceMinor:'5',overageAiPriceMinor:'10'};
+    const db:any={query:jest.fn(async(sql:string)=>{
+      if(sql.startsWith("UPDATE company_subscriptions"))return {rows:[],rowCount:0};
+      if(sql.includes("SELECT cs.id,cs.status"))return {rows:[current],rowCount:1};
+      if(sql.includes("FROM usage_records WHERE subscription_id"))return {rows:[{messages:'80',aiResponses:'12',humanHandoffs:'1'}],rowCount:1};
+      if(sql.includes("FROM agency_users"))return {rows:[{activeSeats:3,activeChannels:2,reservedMessages:'10'}],rowCount:1};
+      if(sql.includes("FROM billing_invoices"))return {rows:[],rowCount:0};
+      return {rows:[],rowCount:0};
+    })};
+    const service=new BillingService(db,{get:jest.fn()} as any);
+    const result=await service.tenantSummary({agencyId,id:'user-id',role:'owner'} as any);
+    expect(result.allowances.messages.used).toBe('80');
+    expect(result.allowances.messages.reserved).toBe('10');
+    expect(result.allowances.messages.remaining).toBe('10');
+    expect(result.capacity.activeSeats).toBe(3);
+    expect(result.allowances.estimatedOverageMinor).toBe('0');
+  });
+
 });
