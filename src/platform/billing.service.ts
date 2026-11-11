@@ -144,6 +144,47 @@ export class BillingService {
     return {items:result.rows,limit,offset};
   }
 
+  async platformUsageSummary(admin:PlatformAdmin){
+    this.requireAdmin(admin,['super_admin','billing_admin','platform_support','security_auditor']);
+    const result=await this.db.query<any>(`SELECT a.id AS "agencyId",a.name AS "companyName",
+        cs.id AS "subscriptionId",cs.status,p.name AS "planName",cs.currency,
+        cs.current_period_start AS "periodStart",cs.current_period_end AS "periodEnd",
+        p.included_messages AS "includedMessages",p.included_ai_responses AS "includedAiResponses",
+        p.max_seats AS "maxSeats",p.max_channels AS "maxChannels",
+        p.overage_message_price_minor AS "overageMessagePriceMinor",p.overage_ai_price_minor AS "overageAiPriceMinor",
+        COALESCE(u.messages,0)::text AS messages,COALESCE(u.ai_responses,0)::text AS "aiResponses",
+        COALESCE(seats.total,0)::int AS "activeSeats",COALESCE(channels.total,0)::int AS "activeChannels",
+        COALESCE(reserved.total,0)::text AS "reservedMessages"
+      FROM agencies a
+      JOIN LATERAL (
+        SELECT * FROM company_subscriptions
+        WHERE agency_id=a.id AND status IN ('active','trialing','past_due')
+          AND current_period_start<=now() AND current_period_end>now()
+          AND (status<>'trialing' OR trial_ends_at IS NULL OR trial_ends_at>now())
+        ORDER BY created_at DESC LIMIT 1
+      ) cs ON true
+      JOIN subscription_plans p ON p.id=cs.plan_id
+      LEFT JOIN LATERAL (
+        SELECT sum(quantity) FILTER(WHERE metric IN ('message_in','message_out')) AS messages,
+          sum(quantity) FILTER(WHERE metric='ai_response') AS ai_responses
+        FROM usage_records WHERE subscription_id=cs.id
+          AND occurred_at>=cs.current_period_start AND occurred_at<cs.current_period_end
+      ) u ON true
+      LEFT JOIN LATERAL (SELECT count(*) AS total FROM agency_users WHERE agency_id=a.id AND is_active=true) seats ON true
+      LEFT JOIN LATERAL (SELECT count(*) AS total FROM channel_connections WHERE agency_id=a.id AND status<>'disabled') channels ON true
+      LEFT JOIN LATERAL (SELECT count(*) AS total FROM message_usage_reservations WHERE subscription_id=cs.id AND status='reserved' AND expires_at>now()) reserved ON true
+      ORDER BY a.name`);
+    const items=result.rows.map((r:any)=>{
+      const messages=BigInt(r.messages||'0'),ai=BigInt(r.aiResponses||'0'),messageLimit=BigInt(r.includedMessages||0),aiLimit=BigInt(r.includedAiResponses||0);
+      const messageOver=messages>messageLimit?messages-messageLimit:0n,aiOver=ai>aiLimit?ai-aiLimit:0n;
+      const messageCost=messageOver*BigInt(r.overageMessagePriceMinor||0),aiCost=aiOver*BigInt(r.overageAiPriceMinor||0);
+      return {...r,messageRemaining:(messageLimit>messages+BigInt(r.reservedMessages||'0')?messageLimit-messages-BigInt(r.reservedMessages||'0'):0n).toString(),
+        aiRemaining:(aiLimit>ai?aiLimit-ai:0n).toString(),messageOverage:messageOver.toString(),aiOverage:aiOver.toString(),
+        estimatedOverageMinor:(messageCost+aiCost).toString()};
+    });
+    return {items,tenantCount:items.length,generatedAt:new Date().toISOString()};
+  }
+
   async tenantSummary(user:AraUser){
     this.requireBillingManager(user);
     await this.db.query("UPDATE company_subscriptions SET status='expired',updated_at=now() WHERE agency_id=$1 AND status IN ('trialing','active','past_due') AND current_period_end<=now()",[user.agencyId]);
@@ -151,18 +192,40 @@ export class BillingService {
       FROM company_subscriptions cs JOIN subscription_plans p ON p.id=cs.plan_id
       WHERE cs.agency_id=$1 AND cs.status IN ('trialing','active','past_due') ORDER BY cs.created_at DESC LIMIT 1`,[user.agencyId]);
     const current=subscription.rows[0]||null;
-    let usage={messages:0,aiResponses:0,humanHandoffs:0};
+    let usage:any={messages:'0',aiResponses:'0',humanHandoffs:'0',reservedMessages:'0'};
+    let capacity:any={activeSeats:0,activeChannels:0};
     if(current){
-      const r=await this.db.query<any>(`SELECT
-        COALESCE(sum(quantity) FILTER(WHERE metric IN ('message_in','message_out')),0)::bigint AS messages,
-        COALESCE(sum(quantity) FILTER(WHERE metric='ai_response'),0)::bigint AS "aiResponses",
-        COALESCE(sum(quantity) FILTER(WHERE metric='human_handoff'),0)::bigint AS "humanHandoffs"
-        FROM usage_records WHERE subscription_id=$1 AND occurred_at >= $2 AND occurred_at < $3`,
-        [current.id,current.currentPeriodStart,current.currentPeriodEnd]);
-      usage=r.rows[0];
+      const [u,c]=await Promise.all([
+        this.db.query<any>(`SELECT
+          COALESCE(sum(quantity) FILTER(WHERE metric IN ('message_in','message_out')),0)::text AS messages,
+          COALESCE(sum(quantity) FILTER(WHERE metric='ai_response'),0)::text AS "aiResponses",
+          COALESCE(sum(quantity) FILTER(WHERE metric='human_handoff'),0)::text AS "humanHandoffs"
+          FROM usage_records WHERE subscription_id=$1 AND occurred_at >= $2 AND occurred_at < $3`,
+          [current.id,current.currentPeriodStart,current.currentPeriodEnd]),
+        this.db.query<any>(`SELECT
+          (SELECT count(*)::int FROM agency_users WHERE agency_id=$1 AND is_active=true) AS "activeSeats",
+          (SELECT count(*)::int FROM channel_connections WHERE agency_id=$1 AND status<>'disabled') AS "activeChannels",
+          (SELECT count(*)::text FROM message_usage_reservations WHERE subscription_id=$2 AND status='reserved' AND expires_at>now()) AS "reservedMessages"`,
+          [user.agencyId,current.id])
+      ]);
+      usage={...u.rows[0],reservedMessages:c.rows[0].reservedMessages||'0'};
+      capacity={activeSeats:Number(c.rows[0].activeSeats||0),activeChannels:Number(c.rows[0].activeChannels||0)};
     }
+    const messagesUsed=BigInt(usage.messages||'0'),aiUsed=BigInt(usage.aiResponses||'0');
+    const messageIncluded=BigInt(current?.includedMessages||0),aiIncluded=BigInt(current?.includedAiResponses||0);
+    const reserved=BigInt(usage.reservedMessages||'0');
+    const messageOverage=messagesUsed>messageIncluded?messagesUsed-messageIncluded:0n;
+    const aiOverage=aiUsed>aiIncluded?aiUsed-aiIncluded:0n;
+    const messageOverageMinor=messageOverage*BigInt(current?.overageMessagePriceMinor||0);
+    const aiOverageMinor=aiOverage*BigInt(current?.overageAiPriceMinor||0);
+    const allowances={
+      messages:{included:messageIncluded.toString(),used:messagesUsed.toString(),reserved:reserved.toString(),remaining:(messageIncluded>messagesUsed+reserved?messageIncluded-messagesUsed-reserved:0n).toString(),overage:messageOverage.toString(),overageAmountMinor:messageOverageMinor.toString()},
+      aiResponses:{included:aiIncluded.toString(),used:aiUsed.toString(),remaining:(aiIncluded>aiUsed?aiIncluded-aiUsed:0n).toString(),overage:aiOverage.toString(),overageAmountMinor:aiOverageMinor.toString()},
+      estimatedOverageMinor:(messageOverageMinor+aiOverageMinor).toString(),
+      blockedActionsTracking:'not_available'
+    };
     const invoices=await this.db.query('SELECT id,invoice_number AS "invoiceNumber",status,currency,total_minor AS "totalMinor",due_at AS "dueAt",created_at AS "createdAt" FROM billing_invoices WHERE agency_id=$1 ORDER BY created_at DESC LIMIT 20',[user.agencyId]);
-    return {subscription:current,usage,invoices:invoices.rows};
+    return {subscription:current,usage,capacity,allowances,invoices:invoices.rows};
   }
 
   async tenantInvoice(user:AraUser,id:string){
