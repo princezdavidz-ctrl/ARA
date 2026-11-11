@@ -97,7 +97,7 @@ export class AnswerService {
     };
     let hits:Chunk[];
     try{
-      hits=(await this.search.search(x,agencyId,executionContext)).filter(h=>h.similarity>=this.config.get('RAG_MIN_SIMILARITY'));
+      hits=(await this.search.search(x,agencyId,executionContext)).filter(h=>h.retrievalMethod==='keyword'?h.similarity>0:h.similarity>=this.config.get('RAG_MIN_SIMILARITY'));
     }catch(error){
       await this.quota.release(agencyId,quotaKey);
       throw error;
