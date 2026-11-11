@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
+import { recordBlockedSubscriptionAction } from './blocked-subscription-action';
 
 export type MessageQuotaReservation = { allowed: boolean; reason?: string; subscriptionId?: string };
 
@@ -8,7 +9,7 @@ export class MessageUsageQuotaService {
   constructor(private readonly db: DatabaseService) {}
 
   async reserve(agencyId: string, metric: 'message_in' | 'message_out', idempotencyKey: string): Promise<MessageQuotaReservation> {
-    return this.db.transaction(async client => {
+    const outcome = await this.db.transaction(async client => {
       const result = await client.query<any>(`SELECT cs.id,cs.current_period_start AS "periodStart",
           cs.current_period_end AS "periodEnd",p.included_messages AS "includedMessages",
           p.overage_message_price_minor AS "overageMessagePriceMinor"
@@ -49,6 +50,8 @@ export class MessageUsageQuotaService {
         [agencyId, sub.id, metric, idempotencyKey]);
       return { allowed: true, subscriptionId: sub.id };
     });
+    if (!outcome.allowed) await recordBlockedSubscriptionAction(this.db, agencyId, metric, outcome.reason || 'Message quota denied.', outcome.subscriptionId);
+    return outcome;
   }
 
   async consume(agencyId: string, idempotencyKey: string): Promise<void> {
