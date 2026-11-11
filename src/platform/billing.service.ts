@@ -176,7 +176,7 @@ export class BillingService {
       LEFT JOIN LATERAL (SELECT count(*) AS total FROM channel_connections WHERE agency_id=a.id AND status<>'disabled') channels ON true
       LEFT JOIN LATERAL (SELECT count(*) AS total FROM message_usage_reservations WHERE subscription_id=cs.id AND status='reserved' AND expires_at>now()) reserved ON true
       LEFT JOIN LATERAL (
-        SELECT count(*)::int AS total, COALESCE(jsonb_object_agg(x.action_type,x.action_count),'{}'::jsonb) AS breakdown
+        SELECT COALESCE(sum(x.action_count),0)::int AS total, COALESCE(jsonb_object_agg(x.action_type,x.action_count),'{}'::jsonb) AS breakdown
         FROM (SELECT action_type,count(*)::int AS action_count FROM subscription_blocked_actions
           WHERE agency_id=a.id AND occurred_at>=cs.current_period_start AND occurred_at<cs.current_period_end
           GROUP BY action_type) x
@@ -216,7 +216,7 @@ export class BillingService {
           (SELECT count(*)::int FROM channel_connections WHERE agency_id=$1 AND status<>'disabled') AS "activeChannels",
           (SELECT count(*)::text FROM message_usage_reservations WHERE subscription_id=$2 AND status='reserved' AND expires_at>now()) AS "reservedMessages"`,
           [user.agencyId,current.id]),
-        this.db.query<any>(`SELECT count(*)::int AS total, COALESCE(jsonb_object_agg(x.action_type,x.action_count),'{}'::jsonb) AS "byType"
+        this.db.query<any>(`SELECT COALESCE(sum(x.action_count),0)::int AS total, COALESCE(jsonb_object_agg(x.action_type,x.action_count),'{}'::jsonb) AS "byType"
           FROM (SELECT action_type,count(*)::int AS action_count FROM subscription_blocked_actions
             WHERE agency_id=$1 AND occurred_at >= $2 AND occurred_at < $3 GROUP BY action_type) x`,
           [user.agencyId,current.currentPeriodStart,current.currentPeriodEnd])
