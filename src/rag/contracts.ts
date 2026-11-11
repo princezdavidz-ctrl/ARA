@@ -30,4 +30,4 @@ export const answerSchema=z.object({
 
 export type KnowledgeInput=z.infer<typeof knowledgeSchema>;
 export type AnswerInput=z.infer<typeof answerSchema>;
-export type Chunk={documentId:string;title:string;category:string;language:string;content:string;metadata:Record<string,unknown>;similarity:number};
+export type Chunk={documentId:string;title:string;category:string;language:string;content:string;metadata:Record<string,unknown>;similarity:number;retrievalMethod?:'semantic'|'keyword'};
