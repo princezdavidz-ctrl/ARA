@@ -4,6 +4,7 @@ import { AnswerService } from '../rag/answer.service';
 import { AnswerInput } from '../rag/contracts';
 import { ConfigService } from '../config/config.service';
 import { ChannelCredentialVault } from './channel-credential-vault.service';
+import { MessageUsageQuotaService } from './message-usage-quota.service';
 
 interface MessageJob { id: string; agencyId: string; conversationId: string; channel?: string; body: string; subject?: string | null; attempts: number; connectionId?: string | null; }
 interface EmailDeliveryJob extends MessageJob { recipient: string; }
@@ -17,7 +18,7 @@ export class MessageWorker implements OnModuleInit, OnModuleDestroy {
   private timer: ReturnType<typeof setInterval> | undefined;
   private running = false;
 
-  constructor(private readonly db: DatabaseService, private readonly answers: AnswerService, private readonly config: ConfigService, private readonly vault: ChannelCredentialVault) {}
+  constructor(private readonly db: DatabaseService, private readonly answers: AnswerService, private readonly config: ConfigService, private readonly vault: ChannelCredentialVault, private readonly messageQuota: MessageUsageQuotaService) {}
   onModuleInit(): void { this.timer = setInterval(() => void this.tick(), 1500); void this.tick(); }
   onModuleDestroy(): void { if (this.timer) clearInterval(this.timer); }
 
@@ -52,12 +53,21 @@ export class MessageWorker implements OnModuleInit, OnModuleDestroy {
       await client.query("UPDATE messages SET processing_status='processing',processing_started_at=now(),processing_attempts=$2 WHERE id=$1", [job.id, attempts]);
       return { ...job, attempts };
     });
-    if(job) await this.recordUsage(job.agencyId,'message_in','message-in:'+job.id);
     return job;
   }
 
   private async processInbound(job: MessageJob): Promise<void> {
     try {
+      const reservation = await this.messageQuota.reserve(job.agencyId, 'message_in', 'message-in:' + job.id);
+      if (!reservation.allowed) {
+        await this.db.transaction(async client => {
+          await client.query("UPDATE messages SET processing_status='completed',processing_started_at=NULL WHERE id=$1", [job.id]);
+          await client.query("UPDATE conversations SET status='pending',updated_at=now() WHERE id=$1 AND agency_id=$2", [job.conversationId, job.agencyId]);
+          await client.query("INSERT INTO escalations(agency_id,conversation_id,reason) SELECT $1,$2,$3 WHERE NOT EXISTS(SELECT 1 FROM escalations WHERE agency_id=$1 AND conversation_id=$2 AND status IN ('open','claimed'))", [job.agencyId, job.conversationId, reservation.reason || 'Message allowance exhausted; human review required']);
+        });
+        return;
+      }
+      await this.messageQuota.consume(job.agencyId, 'message-in:' + job.id);
       const result = await this.answers.answer({ message: job.body, preferredLanguage: 'auto', filters: {} } as AnswerInput, job.agencyId, { channel: job.channel, conversationId: job.conversationId, messageId: job.id });
       await this.db.transaction(async client => {
         if(result.status==='answered'){
@@ -79,15 +89,17 @@ export class MessageWorker implements OnModuleInit, OnModuleDestroy {
   }
 
 
-  private async recordUsage(agencyId:string,metric:string,idempotencyKey:string):Promise<void>{
-    try{
-      await this.db.query(`INSERT INTO usage_records(agency_id,subscription_id,metric,quantity,idempotency_key,metadata)
-        VALUES($1,(SELECT id FROM company_subscriptions WHERE agency_id=$1 AND status IN ('active','trialing','past_due') AND current_period_start<=now() AND current_period_end>now() ORDER BY created_at DESC LIMIT 1),$2,1,$3,'{}'::jsonb)
-        ON CONFLICT(agency_id,idempotency_key) DO NOTHING`,[agencyId,metric,idempotencyKey]);
-    }catch(error){
-      this.logger.error('Usage metering failed for '+idempotencyKey,error instanceof Error?error.stack:undefined);
-    }
+  private async reserveOutbound(job: MessageJob): Promise<boolean> {
+    const reservation = await this.messageQuota.reserve(job.agencyId, 'message_out', 'message-out:' + job.id);
+    if (reservation.allowed) return true;
+    await this.db.query("UPDATE messages SET delivery_status='failed',delivery_started_at=NULL,delivery_next_attempt_at=NULL,delivery_error=$2 WHERE id=$1 AND delivery_status='sending'", [job.id, (reservation.reason || 'Message allowance exhausted').slice(0, 1000)]);
+    return false;
   }
+
+  private async consumeOutbound(job: MessageJob): Promise<void> {
+    await this.messageQuota.consume(job.agencyId, 'message-out:' + job.id);
+  }
+
 
   private async claimEmailDelivery(): Promise<EmailDeliveryJob | null> {
     return this.db.transaction(async client => {
@@ -104,6 +116,7 @@ export class MessageWorker implements OnModuleInit, OnModuleDestroy {
   }
 
   private async deliverEmail(job: EmailDeliveryJob): Promise<void> {
+    if (!(await this.reserveOutbound(job))) return;
     const connection=job.connectionId?await this.vault.getForTenantConnection(job.agencyId,job.connectionId,true):null;
     if(job.connectionId&&!connection){await this.failEmailDelivery(job,'The linked email connection is no longer active.',true);return;}
     const apiKey=connection?.credentials.apiKey||this.config.get('EMAIL_RESEND_API_KEY');
@@ -121,11 +134,12 @@ export class MessageWorker implements OnModuleInit, OnModuleDestroy {
         const detail = payload.message || payload.name || 'Email provider returned HTTP ' + response.status;
         await this.failEmailDelivery(job, detail, response.status >= 400 && response.status < 500 && response.status !== 429); return;
       }
-      await this.db.query("UPDATE messages SET delivery_status='sent',provider_message_id=$2,delivery_started_at=NULL,delivery_next_attempt_at=NULL,delivery_error=NULL WHERE id=$1 AND delivery_status='sending'", [job.id, payload.id]); await this.recordUsage(job.agencyId,'message_out','message-out:'+job.id);
+      await this.db.query("UPDATE messages SET delivery_status='sent',provider_message_id=$2,delivery_started_at=NULL,delivery_next_attempt_at=NULL,delivery_error=NULL WHERE id=$1 AND delivery_status='sending'", [job.id, payload.id]); await this.consumeOutbound(job);
     } catch (error) { await this.failEmailDelivery(job, error instanceof Error ? error.message : 'Unknown email delivery error', false); }
   }
 
   private async failEmailDelivery(job: EmailDeliveryJob, reason: string, permanent: boolean): Promise<void> {
+    await this.messageQuota.release(job.agencyId, 'message-out:' + job.id);
     const terminal = permanent || job.attempts >= 5;
     const delaySeconds = Math.min(1800, 30 * (2 ** Math.max(0, job.attempts - 1)));
     await this.db.query("UPDATE messages SET delivery_status=$2,delivery_started_at=NULL,delivery_next_attempt_at=CASE WHEN $2='queued' THEN now()+($3*interval '1 second') ELSE NULL END,delivery_error=$4 WHERE id=$1 AND delivery_status='sending'", [job.id, terminal ? 'failed' : 'queued', delaySeconds, reason.slice(0, 1000)]);
@@ -160,7 +174,7 @@ export class MessageWorker implements OnModuleInit, OnModuleDestroy {
       const data=await response.json().catch(()=>({})) as {message_id?:string;id?:string;error?:{message?:string}};
       const id=data.message_id||data.id;
       if(!response.ok||!id){await this.failSocialDelivery(job,data.error?.message||'Instagram Graph API HTTP '+response.status,response.status>=400&&response.status<500&&response.status!==429);return;}
-      await this.db.query("UPDATE messages SET delivery_status='sent',provider_message_id=$2,delivery_started_at=NULL,delivery_next_attempt_at=NULL,delivery_error=NULL WHERE id=$1 AND delivery_status='sending'",[job.id,id]); await this.recordUsage(job.agencyId,'message_out','message-out:'+job.id);
+      await this.db.query("UPDATE messages SET delivery_status='sent',provider_message_id=$2,delivery_started_at=NULL,delivery_next_attempt_at=NULL,delivery_error=NULL WHERE id=$1 AND delivery_status='sending'",[job.id,id]); await this.consumeOutbound(job);
     }catch(error){await this.failSocialDelivery(job,error instanceof Error?error.message:'Unknown Instagram delivery error',false);}
   }
   private async deliverTikTok(job:TikTokDeliveryJob):Promise<void>{
@@ -180,6 +194,7 @@ export class MessageWorker implements OnModuleInit, OnModuleDestroy {
     }catch(error){await this.failSocialDelivery(job,error instanceof Error?error.message:'Unknown TikTok delivery error',false);}
   }
   private async failSocialDelivery(job:MessageJob,reason:string,permanent:boolean):Promise<void>{
+    await this.messageQuota.release(job.agencyId, 'message-out:' + job.id);
     const terminal=permanent||job.attempts>=5;const delay=Math.min(1800,30*(2**Math.max(0,job.attempts-1)));
     await this.db.query("UPDATE messages SET delivery_status=$2,delivery_started_at=NULL,delivery_next_attempt_at=CASE WHEN $2='queued' THEN now()+($3*interval '1 second') ELSE NULL END,delivery_error=$4 WHERE id=$1 AND delivery_status='sending'",[job.id,terminal?'failed':'queued',delay,reason.slice(0,1000)]);
     if(terminal)this.logger.warn('Social message permanently failed for '+job.id+': '+reason);
@@ -198,6 +213,7 @@ export class MessageWorker implements OnModuleInit, OnModuleDestroy {
   }
 
   private async deliverWhatsApp(job: WhatsAppDeliveryJob): Promise<void> {
+    if (!(await this.reserveOutbound(job))) return;
     const connection=job.connectionId?await this.vault.getForTenantConnection(job.agencyId,job.connectionId,true):null;
     if(job.connectionId&&!connection){await this.failWhatsAppDelivery(job,'The linked WhatsApp connection is no longer active.',true);return;}
     const token=connection?.credentials.accessToken||this.config.get('WHATSAPP_ACCESS_TOKEN');
@@ -230,6 +246,7 @@ export class MessageWorker implements OnModuleInit, OnModuleDestroy {
   }
 
   private async failWhatsAppDelivery(job: WhatsAppDeliveryJob, reason: string, permanent: boolean): Promise<void> {
+    await this.messageQuota.release(job.agencyId, 'message-out:' + job.id);
     const terminal = permanent || job.attempts >= 5;
     const delaySeconds = Math.min(1800, 30 * (2 ** Math.max(0, job.attempts - 1)));
     await this.db.query("UPDATE messages SET delivery_status=$2,delivery_started_at=NULL,delivery_next_attempt_at=CASE WHEN $2='queued' THEN now()+($3*interval '1 second') ELSE NULL END,delivery_error=$4 WHERE id=$1 AND delivery_status='sending'", [job.id, terminal ? 'failed' : 'queued', delaySeconds, reason.slice(0, 1000)]);
