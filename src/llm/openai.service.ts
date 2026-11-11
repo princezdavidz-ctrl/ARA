@@ -13,6 +13,7 @@ export interface OpenAiGenerationResult {
   model: string;
   inputTokens?: number;
   outputTokens?: number;
+  provider?: 'openai' | 'ollama';
 }
 
 @Injectable()
@@ -54,6 +55,7 @@ export class OpenAiService implements OnModuleInit {
       model: response.model || this.config.get('OPENAI_CHAT_MODEL'),
       inputTokens: response.usage?.prompt_tokens,
       outputTokens: response.usage?.completion_tokens,
+      provider: 'openai',
     };
   }
   async generate(system: string, user: string): Promise<string> {
