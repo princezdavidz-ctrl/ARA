@@ -19,5 +19,6 @@ import { AdminIntegrationsController } from './admin-integrations.controller';
 import { AdminIntegrationsService } from './admin-integrations.service';
 import { AiUsageController } from './ai-usage.controller';
 import { AiUsageService } from './ai-usage.service';
-@Module({ controllers: [PlatformController, LeadController, PlatformAdminController, ChannelConnectionsController, BillingController, AdminIntegrationsController, AiUsageController], providers: [PlatformService, LeadService, PlatformAdminService, ChannelConnectionsService, ChannelCredentialVault, BillingService, MpesaService, AdminIntegrationsService, AiUsageService, AuthGuard, PlatformAdminGuard, ConfigService, DatabaseService], exports: [AuthGuard, ChannelCredentialVault, BillingService] })
+import { SubscriptionLimitsService } from './subscription-limits.service';
+@Module({ controllers: [PlatformController, LeadController, PlatformAdminController, ChannelConnectionsController, BillingController, AdminIntegrationsController, AiUsageController], providers: [PlatformService, LeadService, PlatformAdminService, ChannelConnectionsService, ChannelCredentialVault, BillingService, MpesaService, AdminIntegrationsService, AiUsageService, SubscriptionLimitsService, AuthGuard, PlatformAdminGuard, ConfigService, DatabaseService], exports: [AuthGuard, ChannelCredentialVault, BillingService] })
 export class PlatformModule {}
