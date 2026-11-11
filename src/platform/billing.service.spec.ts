@@ -69,6 +69,7 @@ describe('BillingService',()=>{
     expect(result.items[0].aiOverage).toBe('5');
     expect(result.items[0].estimatedOverageMinor).toBe('150');
     expect(db.query).toHaveBeenCalledTimes(1);
+    expect(db.query.mock.calls[0][0]).toContain('COALESCE(sum(x.action_count),0)::int AS total');
   });
 
   it('includes reserved messages when calculating remaining tenant allowance',async()=>{
