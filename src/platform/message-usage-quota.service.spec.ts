@@ -17,10 +17,11 @@ describe('MessageUsageQuotaService', () => {
   }
 
   it('blocks new messages after included allowance when overage is disabled', async () => {
-    const { service, client } = setup({ included: '10', consumed: '10', overage: '0' });
+    const { service, client, db } = setup({ included: '10', consumed: '10', overage: '0' });
     const result = await service.reserve(agencyId, 'message_in', 'message-in:blocked');
     expect(result.allowed).toBe(false);
     expect(result.reason).toContain('allowance');
+    expect(db.query).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO subscription_blocked_actions'), [agencyId, subscriptionId, 'message_in', expect.any(String)]);
     expect(client.query).not.toHaveBeenCalledWith(expect.stringContaining('INSERT INTO message_usage_reservations'), expect.anything());
   });
 
