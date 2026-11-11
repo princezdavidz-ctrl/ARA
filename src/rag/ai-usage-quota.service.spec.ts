@@ -18,6 +18,7 @@ describe('AiUsageQuotaService', () => {
     const {db}=makeDb(null);
     const service=new AiUsageQuotaService(db);
     await expect(service.reserve(agencyId,key)).resolves.toMatchObject({allowed:false});
+    expect(db.query).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO subscription_blocked_actions'), [agencyId, null, 'ai_response', expect.any(String)]);
   });
 
   it('blocks at the included response limit when overage is disabled',async()=>{
@@ -25,6 +26,7 @@ describe('AiUsageQuotaService', () => {
     const {db}=makeDb(sub,{consumed:'10',reserved:'0'});
     const service=new AiUsageQuotaService(db);
     await expect(service.reserve(agencyId,key)).resolves.toMatchObject({allowed:false,reason:expect.stringContaining('allowance')});
+    expect(db.query).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO subscription_blocked_actions'), [agencyId, subscriptionId, 'ai_response', expect.any(String)]);
   });
 
   it('allows billable overage when the plan has a positive overage price',async()=>{
