@@ -55,7 +55,7 @@ describe('AnswerService',()=>{
       industry:'general',default_language:'en',enabled:false
     }]})};
     const config:any={get:jest.fn().mockReturnValue(0.3)};
-    const service=new AnswerService(search,ai,config,db,orchestrator,quota);
+    const service=new AnswerService(search,ai,config,db,orchestrator,quota,{generateWithUsage:jest.fn().mockResolvedValue(generated)} as any);
     const result=await service.answer({message:'Can you help me?',preferredLanguage:'auto',filters:{}} as any,agencyId);
 
     expect(result.status).toBe('needs_human');
@@ -70,7 +70,7 @@ describe('AnswerService',()=>{
     const ai:any={generateWithUsage:jest.fn()};
     const db:any={query:jest.fn().mockResolvedValue({rows:[{industry:'general',default_language:'sw'}]})};
     const config:any={get:jest.fn().mockReturnValue(0.3)};
-    const service=new AnswerService(search,ai,config,db,orchestrator,quota);
+    const service=new AnswerService(search,ai,config,db,orchestrator,quota,{generateWithUsage:jest.fn().mockResolvedValue(generated)} as any);
     const result=await service.answer({message:'Nina swali',preferredLanguage:'auto',filters:{}} as any,agencyId);
     expect(result.status).toBe('needs_human');
     expect(result.language).toBe('sw');
@@ -82,7 +82,7 @@ describe('AnswerService',()=>{
     const ai:any={generateWithUsage:jest.fn().mockResolvedValue({...generated,inputTokens:undefined,outputTokens:undefined})};
     const db:any={query:jest.fn().mockResolvedValue({rows:[{industry:'general',default_language:'en'}]})};
     const config:any={get:jest.fn().mockReturnValue(undefined)};
-    const service=new AnswerService(search,ai,config,db,orchestrator,quota);
+    const service=new AnswerService(search,ai,config,db,orchestrator,quota,{generateWithUsage:jest.fn().mockResolvedValue(generated)} as any);
     await service.answer({message:'Question',preferredLanguage:'en',filters:{}} as any,agencyId);
     expect(db.query.mock.calls.some((call:any[])=>String(call[0]).includes('INSERT INTO usage_records'))).toBe(false);
   });
