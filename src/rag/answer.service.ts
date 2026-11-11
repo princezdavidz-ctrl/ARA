@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { DatabaseService } from '../database/database.service';
 import { ConfigService } from '../config/config.service';
 import { OpenAiGenerationResult, OpenAiService } from '../llm/openai.service';
+import { LocalLlmService } from '../llm/local-llm.service';
 import { AiExecutionContext, AiOrchestratorService } from '../llm/ai-orchestrator.service';
 import { AnswerInput, Chunk } from './contracts';
 import { RetrievalService } from './retrieval.service';
@@ -21,7 +22,7 @@ const output=z.object({
 @Injectable()
 export class AnswerService {
   private readonly logger = new Logger(AnswerService.name);
-  constructor(private search:RetrievalService,private ai:OpenAiService,private config:ConfigService,private db:DatabaseService,private orchestrator:AiOrchestratorService,private quota:AiUsageQuotaService){}
+  constructor(private search:RetrievalService,private ai:OpenAiService,private config:ConfigService,private db:DatabaseService,private orchestrator:AiOrchestratorService,private quota:AiUsageQuotaService,private localAi:LocalLlmService){}
 
   private async recordAiUsage(
     agencyId:string,
@@ -35,9 +36,10 @@ export class AnswerService {
     ];
     for(const record of records){
       if(!Number.isSafeInteger(record.quantity)||Number(record.quantity)<=0)continue;
-      const estimatedCostUsd=record.rate===undefined?null:Number((Number(record.quantity)*record.rate/1_000_000).toFixed(10));
+      const provider=usage.provider??'openai';
+      const estimatedCostUsd=provider!=='openai'||record.rate===undefined?null:Number((Number(record.quantity)*record.rate/1_000_000).toFixed(10));
       const metadata={
-        provider:'openai',
+        provider,
         model:usage.model,
         traceId,
         channel:context.channel??'unknown',
@@ -45,7 +47,7 @@ export class AnswerService {
         messageId:context.messageId??null,
         tokenType:record.kind,
         estimatedCostUsd,
-        pricingSource:record.rate===undefined?null:'environment_config',
+        pricingSource:provider!=='openai'||record.rate===undefined?null:'environment_config',
         pricePerMillionUsd:record.rate??null,
       };
       try{
@@ -115,7 +117,14 @@ ${instructions||'No additional company instructions have been configured.'}
 Reply in the customer's requested language. If preferredLanguage is auto, use ${lang}. Return JSON with answer, language(en|sw), status(answered|needs_human), confidence(high|medium|low), citations([{documentId,title}]), escalationReason. An answered response requires at least one citation from the supplied evidence. Keep answers concise and actionable.`;
     try{
       const generated=await this.orchestrator.execute({agencyId,...executionContext,operation:'answer_generation'},async metadata=>{
-        const result=await this.ai.generateWithUsage(system,JSON.stringify({question:x.message,preferredLanguage:x.preferredLanguage,evidence}));
+        let result:OpenAiGenerationResult;
+        try {
+          result=await this.ai.generateWithUsage(system,JSON.stringify({question:x.message,preferredLanguage:x.preferredLanguage,evidence}));
+        } catch (primaryError) {
+          if(!this.config.get('LOCAL_LLM_ENABLED')) throw primaryError;
+          this.logger.warn('Primary OpenAI generation failed; attempting local Ollama fallback.');
+          result=await this.localAi.generateWithUsage(system,JSON.stringify({question:x.message,preferredLanguage:x.preferredLanguage,evidence}));
+        }
         await this.recordAiUsage(agencyId,executionContext,metadata.traceId,result);
         return result.content;
       });
