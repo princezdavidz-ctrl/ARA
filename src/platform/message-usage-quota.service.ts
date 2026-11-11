@@ -40,7 +40,7 @@ export class MessageUsageQuotaService {
         [sub.id, sub.periodStart, sub.periodEnd]);
       const used = BigInt(usage.rows[0].consumed || '0') + BigInt(usage.rows[0].reserved || '0');
       if (used >= BigInt(sub.includedMessages || 0) && BigInt(sub.overageMessagePriceMinor || 0) <= 0n) {
-        return { allowed: false, reason: 'The included message allowance for this subscription period has been reached.' };
+        return { allowed: false, reason: 'The included message allowance for this subscription period has been reached.', subscriptionId: sub.id };
       }
 
       await client.query(`INSERT INTO message_usage_reservations(agency_id,subscription_id,metric,idempotency_key,status,expires_at)
