@@ -28,6 +28,9 @@ export class BillingController {
   @UseGuards(PlatformAdminGuard) @Get('admin/billing/invoices')
   listInvoices(@Req() req:{platformAdmin:PlatformAdmin},@Query() query:unknown){return this.billing.listAdminInvoices(req.platformAdmin,query);}
 
+  @UseGuards(PlatformAdminGuard) @Get('admin/billing/usage')
+  platformUsage(@Req() req:{platformAdmin:PlatformAdmin}){return this.billing.platformUsageSummary(req.platformAdmin);}
+
   @UseGuards(AuthGuard) @Get('platform/billing')
   tenantSummary(@Req() req:{user:AraUser}){return this.billing.tenantSummary(req.user);}
 

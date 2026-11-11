@@ -3,6 +3,7 @@ import { createCipheriv, createHash, randomBytes } from 'node:crypto';
 import { DatabaseService } from '../database/database.service';
 import { AraUser } from './auth.guard';
 import { ChannelCredentialVault } from './channel-credential-vault.service';
+import { SubscriptionLimitsService } from './subscription-limits.service';
 
 type Provider = 'whatsapp'|'email'|'instagram'|'facebook_messenger'|'tiktok';
 const providers: Provider[] = ['whatsapp','email','instagram','facebook_messenger','tiktok'];
@@ -10,7 +11,7 @@ type ConnectionRow = { id:string; provider:Provider; displayName:string; externa
 
 @Injectable()
 export class ChannelConnectionsService {
-  constructor(private readonly db:DatabaseService,private readonly vault:ChannelCredentialVault) {}
+  constructor(private readonly db:DatabaseService,private readonly vault:ChannelCredentialVault,private readonly limits:SubscriptionLimitsService) {}
 
   private requireManager(user:AraUser) {
     if (!['owner','admin'].includes(user.role)) throw new ForbiddenException('Only company owners and administrators can manage channel connections');
@@ -66,6 +67,7 @@ export class ChannelConnectionsService {
     const encrypted=this.encrypt(credentials),keyVersion=String(process.env.ARA_CHANNEL_ENCRYPTION_KEY_VERSION||'v1').slice(0,32),verifyToken=credentials.webhookVerifyToken?createHash('sha256').update(String(credentials.webhookVerifyToken)).digest('hex'):null;
     try {
       return await this.db.transaction(async client=>{
+        await this.limits.assertChannelAvailable(client,user.agencyId);
         const r=await client.query<ConnectionRow>('INSERT INTO channel_connections(agency_id,provider,display_name,external_account_id,external_phone_number_id,status,encrypted_credentials,credential_key_version,webhook_secret_hash,connected_by) VALUES($1,$2,$3,$4,$5,\'pending\',$6,$7,$8,$9) RETURNING '+this.projection(),
           [user.agencyId,provider,displayName,externalAccountId,phone,encrypted,keyVersion,verifyToken,user.id]);
         await client.query('INSERT INTO audit_logs(agency_id,actor_user_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5,$6)',

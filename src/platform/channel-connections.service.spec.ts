@@ -8,7 +8,7 @@ describe('ChannelConnectionsService', () => {
 
   it('rejects channel management by agents', async () => {
     const db:any={query:jest.fn(),transaction:jest.fn()};
-    const service=new ChannelConnectionsService(db,{} as any);
+    const service=new ChannelConnectionsService(db,{} as any,{assertChannelAvailable:jest.fn().mockResolvedValue(undefined)} as any);
     await expect(service.create({...user,role:'agent'},{provider:'email'})).rejects.toBeInstanceOf(ForbiddenException);
     expect(db.transaction).not.toHaveBeenCalled();
   });
@@ -18,7 +18,7 @@ describe('ChannelConnectionsService', () => {
     const saved:any={id:'33333333-3333-4333-8333-333333333333',provider:'email',displayName:'Support mailbox',externalAccountId:'support@example.test',externalPhoneNumberId:null,status:'pending',scopes:[],lastVerifiedAt:null,lastErrorCode:null,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
     const client:any={query:jest.fn(async(sql:string)=>sql.startsWith('INSERT INTO channel_connections')?{rows:[saved],rowCount:1}:{rows:[],rowCount:1})};
     const db:any={query:jest.fn(),transaction:jest.fn(async(fn:any)=>fn(client))};
-    const service=new ChannelConnectionsService(db,{} as any);
+    const service=new ChannelConnectionsService(db,{} as any,{assertChannelAvailable:jest.fn().mockResolvedValue(undefined)} as any);
     const result=await service.create(user,{provider:'email',displayName:'Support mailbox',externalAccountId:'support@example.test',credentials:{apiKey:'secret-provider-token'}});
     const insertArgs=client.query.mock.calls[0][1];
     const ciphertext=insertArgs[5] as Buffer;
@@ -30,7 +30,7 @@ describe('ChannelConnectionsService', () => {
   });
 
   it('requires a configured 32-byte encryption key', async () => {
-    const service=new ChannelConnectionsService({} as any,{} as any);
+    const service=new ChannelConnectionsService({} as any,{} as any,{assertChannelAvailable:jest.fn().mockResolvedValue(undefined)} as any);
     expect(() => (service as any).encrypt({token:'x'})).toThrow(ServiceUnavailableException);
   });
 
@@ -42,7 +42,7 @@ describe('ChannelConnectionsService', () => {
     const client:any={query:jest.fn(async(sql:string)=>sql.startsWith('UPDATE channel_connections')?{rows:[saved],rowCount:1}:{rows:[],rowCount:1})};
     const db:any={query:jest.fn(),transaction:jest.fn(async(fn:any)=>fn(client))};
     const vault:any={getForTenantConnection:jest.fn().mockResolvedValue({id:saved.id,agencyId:user.agencyId,provider,externalAccountId:saved.externalAccountId,externalPhoneNumberId:null,credentials,keyVersion:'v1'})};
-    const service=new ChannelConnectionsService(db,vault);
+    const service=new ChannelConnectionsService(db,vault,{assertChannelAvailable:jest.fn().mockResolvedValue(undefined)} as any);
     const result=await service.verifyAndActivate(user,saved.id);
     expect(result.connection.status).toBe('active');
     expect(result.message).toContain('test a real inbound and outbound message');
@@ -52,7 +52,7 @@ describe('ChannelConnectionsService', () => {
   it('does not activate email connections missing relay credentials',async()=>{
     const db:any={query:jest.fn(),transaction:jest.fn()};
     const vault:any={getForTenantConnection:jest.fn().mockResolvedValue({id:'connection-1',provider:'email',credentials:{apiKey:'resend-key'}})};
-    const service=new ChannelConnectionsService(db,vault);
+    const service=new ChannelConnectionsService(db,vault,{assertChannelAvailable:jest.fn().mockResolvedValue(undefined)} as any);
     await expect(service.verifyAndActivate(user,'connection-1')).rejects.toThrow('Missing required encrypted credentials: webhookSecret, fromAddress');
     expect(db.transaction).not.toHaveBeenCalled();
   });
