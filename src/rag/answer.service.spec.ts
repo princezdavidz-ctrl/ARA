@@ -101,4 +101,26 @@ describe('AnswerService',()=>{
     expect(limitedQuota.consume).not.toHaveBeenCalled();
   });
 
+  it('falls back to the local model after OpenAI generation fails without recording cloud cost',async()=>{
+    const search:any={search:jest.fn().mockResolvedValue([hit])};
+    const ai:any={generateWithUsage:jest.fn().mockRejectedValue(new Error('OpenAI unavailable'))};
+    const localAi:any={generateWithUsage:jest.fn().mockResolvedValue({...generated,provider:'ollama',model:'qwen2.5:7b-instruct'})};
+    const db:any={query:jest.fn().mockResolvedValue({rows:[{industry:'general',default_language:'en'}]})};
+    const config:any={get:jest.fn((key:string)=>({
+      RAG_MIN_SIMILARITY:0.3,LOCAL_LLM_ENABLED:true,
+      AI_INPUT_USD_PER_1M_TOKENS:0.15,AI_OUTPUT_USD_PER_1M_TOKENS:0.6,
+    }[key]))};
+    const service=new AnswerService(search,ai,config,db,orchestrator,quota,localAi);
+    const result=await service.answer({message:'What is the response time?',preferredLanguage:'en',filters:{}} as any,agencyId,{messageId:'offline-message'});
+
+    expect(result.status).toBe('answered');
+    expect(ai.generateWithUsage).toHaveBeenCalledTimes(1);
+    expect(localAi.generateWithUsage).toHaveBeenCalledTimes(1);
+    expect(quota.consume).toHaveBeenCalledWith(agencyId,'ai-response:offline-message');
+    const writes=db.query.mock.calls.filter((call:any[])=>String(call[0]).includes('INSERT INTO usage_records'));
+    expect(JSON.parse(writes[0][1][4])).toMatchObject({
+      provider:'ollama',model:'qwen2.5:7b-instruct',estimatedCostUsd:null,pricingSource:null
+    });
+  });
+
 });
