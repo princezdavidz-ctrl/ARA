@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from './config/config.service';
 import { DatabaseService } from './database/database.service';
 import { OpenAiService } from './llm/openai.service';
+import { LocalLlmService } from './llm/local-llm.service';
 import { AiOrchestratorService } from './llm/ai-orchestrator.service';
 import { HealthController } from './http/health.controller';
 import { KnowledgeController } from './http/knowledge.controller';
@@ -28,6 +29,6 @@ import { TikTokWebhookService } from './platform/tiktok-webhook.service';
 @Module({
   imports: [PlatformModule],
   controllers: [HealthController, KnowledgeController, AnswerController, WhatsAppWebhookController, EmailWebhookController, InstagramWebhookController, TikTokWebhookController, PropertyController, DashboardController],
-  providers: [ConfigService, DatabaseService, OpenAiService, AiOrchestratorService, IngestionService, RetrievalService, EmbeddingUsageService, AiUsageQuotaService, MessageUsageQuotaService, AnswerService, MessageWorker, WhatsAppWebhookService, EmailWebhookService, InstagramWebhookService, TikTokWebhookService, PropertyService],
+  providers: [ConfigService, DatabaseService, OpenAiService, LocalLlmService, AiOrchestratorService, IngestionService, RetrievalService, EmbeddingUsageService, AiUsageQuotaService, MessageUsageQuotaService, AnswerService, MessageWorker, WhatsAppWebhookService, EmailWebhookService, InstagramWebhookService, TikTokWebhookService, PropertyService],
 })
 export class AppModule {}

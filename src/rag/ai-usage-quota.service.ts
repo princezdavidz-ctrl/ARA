@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
+import { recordBlockedSubscriptionAction } from '../platform/blocked-subscription-action';
 
 export type AiQuotaReservation = { allowed: boolean; reason?: string; subscriptionId?: string };
 
@@ -8,7 +9,7 @@ export class AiUsageQuotaService {
   constructor(private readonly db: DatabaseService) {}
 
   async reserve(agencyId: string, idempotencyKey: string): Promise<AiQuotaReservation> {
-    return this.db.transaction(async client => {
+    const outcome = await this.db.transaction(async client => {
       const subscription = await client.query<any>(`SELECT cs.id,cs.status,cs.current_period_start AS "periodStart",
           cs.current_period_end AS "periodEnd",p.included_ai_responses AS "includedAiResponses",
           p.overage_ai_price_minor AS "overageAiPriceMinor"
@@ -42,7 +43,7 @@ export class AiUsageQuotaService {
       const included = BigInt(sub.includedAiResponses || 0);
       const overagePrice = BigInt(sub.overageAiPriceMinor || 0);
       if (used >= included && overagePrice <= 0n) {
-        return { allowed: false, reason: 'The AI response allowance for this subscription period has been reached.' };
+        return { allowed: false, reason: 'The AI response allowance for this subscription period has been reached.', subscriptionId: sub.id };
       }
 
       await client.query(`INSERT INTO ai_usage_reservations(agency_id,subscription_id,idempotency_key,status,expires_at)
@@ -52,6 +53,8 @@ export class AiUsageQuotaService {
         [agencyId, sub.id, idempotencyKey]);
       return { allowed: true, subscriptionId: sub.id };
     });
+    if (!outcome.allowed) await recordBlockedSubscriptionAction(this.db, agencyId, 'ai_response', outcome.reason || 'AI response quota denied.', outcome.subscriptionId);
+    return outcome;
   }
 
   async consume(agencyId: string, idempotencyKey: string): Promise<void> {

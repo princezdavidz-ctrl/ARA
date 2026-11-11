@@ -154,7 +154,9 @@ export class BillingService {
         p.overage_message_price_minor AS "overageMessagePriceMinor",p.overage_ai_price_minor AS "overageAiPriceMinor",
         COALESCE(u.messages,0)::text AS messages,COALESCE(u.ai_responses,0)::text AS "aiResponses",
         COALESCE(seats.total,0)::int AS "activeSeats",COALESCE(channels.total,0)::int AS "activeChannels",
-        COALESCE(reserved.total,0)::text AS "reservedMessages"
+        COALESCE(reserved.total,0)::text AS "reservedMessages",
+        COALESCE(blocked.total,0)::int AS "blockedActionsTotal",
+        COALESCE(blocked.breakdown,'{}'::jsonb) AS "blockedActionsByType"
       FROM agencies a
       JOIN LATERAL (
         SELECT * FROM company_subscriptions
@@ -173,6 +175,12 @@ export class BillingService {
       LEFT JOIN LATERAL (SELECT count(*) AS total FROM agency_users WHERE agency_id=a.id AND is_active=true) seats ON true
       LEFT JOIN LATERAL (SELECT count(*) AS total FROM channel_connections WHERE agency_id=a.id AND status<>'disabled') channels ON true
       LEFT JOIN LATERAL (SELECT count(*) AS total FROM message_usage_reservations WHERE subscription_id=cs.id AND status='reserved' AND expires_at>now()) reserved ON true
+      LEFT JOIN LATERAL (
+        SELECT COALESCE(sum(x.action_count),0)::int AS total, COALESCE(jsonb_object_agg(x.action_type,x.action_count),'{}'::jsonb) AS breakdown
+        FROM (SELECT action_type,count(*)::int AS action_count FROM subscription_blocked_actions
+          WHERE agency_id=a.id AND occurred_at>=cs.current_period_start AND occurred_at<cs.current_period_end
+          GROUP BY action_type) x
+      ) blocked ON true
       ORDER BY a.name`);
     const items=result.rows.map((r:any)=>{
       const messages=BigInt(r.messages||'0'),ai=BigInt(r.aiResponses||'0'),messageLimit=BigInt(r.includedMessages||0),aiLimit=BigInt(r.includedAiResponses||0);
@@ -180,7 +188,7 @@ export class BillingService {
       const messageCost=messageOver*BigInt(r.overageMessagePriceMinor||0),aiCost=aiOver*BigInt(r.overageAiPriceMinor||0);
       return {...r,messageRemaining:(messageLimit>messages+BigInt(r.reservedMessages||'0')?messageLimit-messages-BigInt(r.reservedMessages||'0'):0n).toString(),
         aiRemaining:(aiLimit>ai?aiLimit-ai:0n).toString(),messageOverage:messageOver.toString(),aiOverage:aiOver.toString(),
-        estimatedOverageMinor:(messageCost+aiCost).toString()};
+        estimatedOverageMinor:(messageCost+aiCost).toString(),blockedActionsTotal:Number(r.blockedActionsTotal||0),blockedActionsByType:r.blockedActionsByType||{}};
     });
     return {items,tenantCount:items.length,generatedAt:new Date().toISOString()};
   }
@@ -194,8 +202,9 @@ export class BillingService {
     const current=subscription.rows[0]||null;
     let usage:any={messages:'0',aiResponses:'0',humanHandoffs:'0',reservedMessages:'0'};
     let capacity:any={activeSeats:0,activeChannels:0};
+    let blockedActions:any={total:0,byType:{}};
     if(current){
-      const [u,c]=await Promise.all([
+      const [u,c,b]=await Promise.all([
         this.db.query<any>(`SELECT
           COALESCE(sum(quantity) FILTER(WHERE metric IN ('message_in','message_out')),0)::text AS messages,
           COALESCE(sum(quantity) FILTER(WHERE metric='ai_response'),0)::text AS "aiResponses",
@@ -206,10 +215,15 @@ export class BillingService {
           (SELECT count(*)::int FROM agency_users WHERE agency_id=$1 AND is_active=true) AS "activeSeats",
           (SELECT count(*)::int FROM channel_connections WHERE agency_id=$1 AND status<>'disabled') AS "activeChannels",
           (SELECT count(*)::text FROM message_usage_reservations WHERE subscription_id=$2 AND status='reserved' AND expires_at>now()) AS "reservedMessages"`,
-          [user.agencyId,current.id])
+          [user.agencyId,current.id]),
+        this.db.query<any>(`SELECT COALESCE(sum(x.action_count),0)::int AS total, COALESCE(jsonb_object_agg(x.action_type,x.action_count),'{}'::jsonb) AS "byType"
+          FROM (SELECT action_type,count(*)::int AS action_count FROM subscription_blocked_actions
+            WHERE agency_id=$1 AND occurred_at >= $2 AND occurred_at < $3 GROUP BY action_type) x`,
+          [user.agencyId,current.currentPeriodStart,current.currentPeriodEnd])
       ]);
       usage={...u.rows[0],reservedMessages:c.rows[0].reservedMessages||'0'};
       capacity={activeSeats:Number(c.rows[0].activeSeats||0),activeChannels:Number(c.rows[0].activeChannels||0)};
+      blockedActions={total:Number(b.rows[0]?.total||0),byType:b.rows[0]?.byType||{}};
     }
     const messagesUsed=BigInt(usage.messages||'0'),aiUsed=BigInt(usage.aiResponses||'0');
     const messageIncluded=BigInt(current?.includedMessages||0),aiIncluded=BigInt(current?.includedAiResponses||0);
@@ -222,10 +236,10 @@ export class BillingService {
       messages:{included:messageIncluded.toString(),used:messagesUsed.toString(),reserved:reserved.toString(),remaining:(messageIncluded>messagesUsed+reserved?messageIncluded-messagesUsed-reserved:0n).toString(),overage:messageOverage.toString(),overageAmountMinor:messageOverageMinor.toString()},
       aiResponses:{included:aiIncluded.toString(),used:aiUsed.toString(),remaining:(aiIncluded>aiUsed?aiIncluded-aiUsed:0n).toString(),overage:aiOverage.toString(),overageAmountMinor:aiOverageMinor.toString()},
       estimatedOverageMinor:(messageOverageMinor+aiOverageMinor).toString(),
-      blockedActionsTracking:'not_available'
+      blockedActionsTracking:'available'
     };
     const invoices=await this.db.query('SELECT id,invoice_number AS "invoiceNumber",status,currency,total_minor AS "totalMinor",due_at AS "dueAt",created_at AS "createdAt" FROM billing_invoices WHERE agency_id=$1 ORDER BY created_at DESC LIMIT 20',[user.agencyId]);
-    return {subscription:current,usage,capacity,allowances,invoices:invoices.rows};
+    return {subscription:current,usage,capacity,allowances,blockedActions,invoices:invoices.rows};
   }
 
   async tenantInvoice(user:AraUser,id:string){

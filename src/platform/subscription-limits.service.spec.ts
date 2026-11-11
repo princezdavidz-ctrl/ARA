@@ -3,6 +3,7 @@ import { SubscriptionLimitsService } from './subscription-limits.service';
 
 describe('SubscriptionLimitsService', () => {
   const agencyId = '22222222-2222-4222-8222-222222222222';
+  const db: any = { query: jest.fn().mockResolvedValue({ rows: [], rowCount: 1 }) };
   function clientWith(plan: any, count: number) {
     return { query: jest.fn(async (sql: string) => {
       if (sql.includes('SELECT cs.id')) return { rows: plan ? [plan] : [], rowCount: plan ? 1 : 0 };
@@ -12,7 +13,7 @@ describe('SubscriptionLimitsService', () => {
 
   it('allows adding a seat below the plan limit', async () => {
     const client = clientWith({ id: 'sub-1', maxSeats: 5 }, 4);
-    await expect(new SubscriptionLimitsService({} as any).assertSeatAvailable(client, agencyId)).resolves.toBeUndefined();
+    await expect(new SubscriptionLimitsService(db).assertSeatAvailable(client, agencyId)).resolves.toBeUndefined();
     expect(client.query).toHaveBeenCalledTimes(2);
   });
 
