@@ -3,11 +3,12 @@ import { createHash, createHmac, randomBytes, timingSafeEqual, scrypt as scryptC
 import { promisify } from 'node:util';
 import { DatabaseService } from '../database/database.service';
 import { ConfigService } from '../config/config.service';
+import { SubscriptionLimitsService } from './subscription-limits.service';
 const scrypt = promisify(scryptCb);
 type User = { id:string; agencyId:string; email:string; fullName:string; role:string };
 @Injectable()
 export class PlatformService implements OnApplicationBootstrap {
-  constructor(private db:DatabaseService, private config:ConfigService) {}
+  constructor(private db:DatabaseService, private config:ConfigService, private readonly limits:SubscriptionLimitsService) {}
   async onApplicationBootstrap() {
     const password = process.env.ARA_BOOTSTRAP_OWNER_PASSWORD;
     if (!password) return;
@@ -52,7 +53,20 @@ export class PlatformService implements OnApplicationBootstrap {
   async logout(token:string){if(token)await this.db.query('UPDATE refresh_sessions SET revoked_at=now() WHERE token_hash=$1 AND revoked_at IS NULL',[createHash('sha256').update(token).digest('hex')]);return {success:true};}
   private requireRole(u:User,roles:string[]){if(!roles.includes(u.role))throw new ForbiddenException('Insufficient role');}
   async team(u:User){this.requireRole(u,['owner','admin','manager']);return (await this.db.query('SELECT id,email,full_name AS "fullName",role,is_active AS "isActive",created_at AS "createdAt" FROM agency_users WHERE agency_id=$1 ORDER BY created_at',[u.agencyId])).rows;}
-  async addMember(u:User,b:any){this.requireRole(u,['owner','admin']);const email=String(b?.email||'').trim().toLowerCase(),fullName=String(b?.fullName||'').trim(),password=String(b?.password||''),role=String(b?.role||'agent');if(!/^\S+@\S+\.\S+$/.test(email)||fullName.length<2||password.length<12||!['admin','manager','agent'].includes(role))throw new BadRequestException('Invalid member details or role. Password minimum is 12 characters.');const hash=await this.hashPassword(password);try{const r=await this.db.query('INSERT INTO agency_users(agency_id,email,full_name,password_hash,role) VALUES($1,$2,$3,$4,$5) RETURNING id,email,full_name AS "fullName",role,is_active AS "isActive"',[u.agencyId,email,fullName,hash,role]);await this.audit(u.agencyId,u.id,'team.member_added','user',r.rows[0].id,{role});return r.rows[0];}catch(e:any){if(e.code==='23505')throw new ConflictException('Email already exists in this agency');throw e;}}
+  async addMember(u:User,b:any){
+    this.requireRole(u,['owner','admin']);
+    const email=String(b?.email||'').trim().toLowerCase(),fullName=String(b?.fullName||'').trim(),password=String(b?.password||''),role=String(b?.role||'agent');
+    if(!/^\\S+@\\S+\\.\\S+$/.test(email)||fullName.length<2||password.length<12||!['admin','manager','agent'].includes(role))throw new BadRequestException('Invalid member details or role. Password minimum is 12 characters.');
+    const hash=await this.hashPassword(password);
+    try{
+      return await this.db.transaction(async client=>{
+        await this.limits.assertSeatAvailable(client,u.agencyId);
+        const r=await client.query('INSERT INTO agency_users(agency_id,email,full_name,password_hash,role) VALUES($1,$2,$3,$4,$5) RETURNING id,email,full_name AS "fullName",role,is_active AS "isActive"',[u.agencyId,email,fullName,hash,role]);
+        await client.query('INSERT INTO audit_logs(agency_id,actor_user_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5,$6)',[u.agencyId,u.id,'team.member_added','user',r.rows[0].id,JSON.stringify({role})]);
+        return r.rows[0];
+      });
+    }catch(e:any){if(e.code==='23505')throw new ConflictException('Email already exists in this agency');throw e;}
+  }
   async deactivate(u:User,id:string){this.requireRole(u,['owner','admin']);if(id===u.id)throw new BadRequestException('You cannot deactivate your own account');const r=await this.db.query('UPDATE agency_users SET is_active=false WHERE id=$1 AND agency_id=$2 AND is_active=true RETURNING id',[id,u.agencyId]);if(!r.rowCount)throw new NotFoundException('Team member not found');await this.db.query('UPDATE refresh_sessions SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL',[id]);await this.audit(u.agencyId,u.id,'team.member_deactivated','user',id);return {success:true};}
   async createConversation(u:User,b:any){const channel=String(b?.channel||'web');if(!['web','whatsapp','messenger','instagram','telegram','email','phone','other'].includes(channel))throw new BadRequestException('Unsupported channel');return (await this.db.query('INSERT INTO conversations(agency_id,channel,customer_name,customer_contact) VALUES($1,$2,$3,$4) RETURNING *',[u.agencyId,channel,b?.customerName||null,b?.customerContact||null])).rows[0];}
   async conversations(u:User){return (await this.db.query('SELECT * FROM conversations WHERE agency_id=$1 ORDER BY updated_at DESC LIMIT 100',[u.agencyId])).rows;}
