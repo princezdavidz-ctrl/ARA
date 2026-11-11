@@ -26,7 +26,7 @@ describe('AnswerService',()=>{
       AI_INPUT_USD_PER_1M_TOKENS:0.15,
       AI_OUTPUT_USD_PER_1M_TOKENS:0.6,
     }[key]))};
-    const service=new AnswerService(search,ai,config,db,orchestrator,quota);
+    const service=new AnswerService(search,ai,config,db,orchestrator,quota,{generateWithUsage:jest.fn().mockResolvedValue(generated)} as any);
     const context={channel:'whatsapp',conversationId:'conversation-1',messageId:'message-1'};
     const result=await service.answer({message:'What is the response time?',preferredLanguage:'en',filters:{}} as any,agencyId,context);
     expect(result.status).toBe('needs_human');
@@ -92,7 +92,7 @@ describe('AnswerService',()=>{
     const db:any={query:jest.fn().mockResolvedValue({rows:[{industry:'general',default_language:'en'}]})};
     const config:any={get:jest.fn().mockReturnValue(0.3)};
     const limitedQuota:any={reserve:jest.fn().mockResolvedValue({allowed:false,reason:'AI response allowance reached'}),consume:jest.fn(),release:jest.fn()};
-    const service=new AnswerService(search,ai,config,db,orchestrator,limitedQuota);
+    const service=new AnswerService(search,ai,config,db,orchestrator,limitedQuota,{generateWithUsage:jest.fn().mockResolvedValue(generated)} as any);
     const result=await service.answer({message:'Please help',preferredLanguage:'en',filters:{}} as any,agencyId,{messageId:'message-limit'});
     expect(result.status).toBe('needs_human');
     expect(result.escalationReason).toBe('AI response allowance reached');
