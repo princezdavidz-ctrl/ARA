@@ -10,6 +10,15 @@ describe('LocalLlmService', () => {
     }[key])),
   };
 
+  beforeEach(() => {
+    config.get.mockImplementation((key: string) => ({
+      LOCAL_LLM_ENABLED: true,
+      LOCAL_LLM_BASE_URL: 'http://localhost:11434/',
+      LOCAL_LLM_CHAT_MODEL: 'qwen2.5:7b-instruct',
+      LOCAL_LLM_TIMEOUT_MS: 60000,
+    }[key]));
+  });
+
   afterEach(() => jest.restoreAllMocks());
 
   it('uses the local Ollama endpoint and returns structured generation usage', async () => {
@@ -51,5 +60,29 @@ describe('LocalLlmService', () => {
 
     await expect(service.generateWithUsage('system', 'user')).rejects.toThrow('Local LLM fallback is disabled');
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when Ollama returns an unsuccessful HTTP status', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 503 } as Response);
+    const service = new LocalLlmService(config);
+    await expect(service.generateWithUsage('system', 'user'))
+      .rejects.toThrow('Local LLM returned an unsuccessful response.');
+  });
+
+  it('fails closed when Ollama cannot be reached', async () => {
+    jest.spyOn(global, 'fetch').mockRejectedValue(new Error('connection refused'));
+    const service = new LocalLlmService(config);
+    await expect(service.generateWithUsage('system', 'user'))
+      .rejects.toThrow('Local LLM is unavailable.');
+  });
+
+  it('fails closed when Ollama returns an empty message', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ model: 'qwen2.5:7b-instruct', message: { content: '  ' } }),
+    } as Response);
+    const service = new LocalLlmService(config);
+    await expect(service.generateWithUsage('system', 'user'))
+      .rejects.toThrow('Local LLM returned an empty response.');
   });
 });
