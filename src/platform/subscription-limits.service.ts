@@ -22,7 +22,7 @@ export class SubscriptionLimitsService {
     const count = await client.query('SELECT count(*)::int AS total FROM agency_users WHERE agency_id=$1 AND is_active=true', [agencyId]);
     if (Number(count.rows[0]?.total || 0) >= Number(plan.maxSeats)) {
       const reason = 'Your subscription seat limit has been reached. Upgrade your plan or deactivate an existing team member.';
-      await recordBlockedSubscriptionAction(this.db, agencyId, 'seat', reason, plan.id);
+      await recordBlockedSubscriptionAction(this.db, agencyId, 'seat', reason);
       throw new ForbiddenException(reason);
     }
   }
@@ -43,7 +43,7 @@ export class SubscriptionLimitsService {
     const count = await client.query("SELECT count(*)::int AS total FROM channel_connections WHERE agency_id=$1 AND status<>'disabled'", [agencyId]);
     if (Number(count.rows[0]?.total || 0) >= Number(plan.maxChannels)) {
       const reason = 'Your subscription channel limit has been reached. Upgrade your plan or disable an existing channel.';
-      await recordBlockedSubscriptionAction(this.db, agencyId, 'channel', reason, plan.id);
+      await recordBlockedSubscriptionAction(this.db, agencyId, 'channel', reason);
       throw new ForbiddenException(reason);
     }
   }
