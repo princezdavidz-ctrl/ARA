@@ -12,5 +12,17 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["offline-ai"]
+    container_name: ara-ollama
+    ports: ["127.0.0.1:11434:11434"]
+    volumes: ["ara_ollama:/root/.ollama"]
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
 volumes:
   ara_pg:
+  ara_ollama:
