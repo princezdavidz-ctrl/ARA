@@ -20,7 +20,7 @@ export class PlatformAdminService implements OnApplicationBootstrap {
  }
  private async hash(password:string){const salt=randomBytes(16);const key=await scrypt(password,salt,64) as Buffer;return 'scrypt$'+salt.toString('hex')+'$'+key.toString('hex');}
  private async verify(password:string,stored:string){const [kind,salt,keyHex]=stored.split('$');if(kind!=='scrypt'||!salt||!keyHex)return false;const actual=await scrypt(password,Buffer.from(salt,'hex'),64) as Buffer,expected=Buffer.from(keyHex,'hex');return actual.length===expected.length&&timingSafeEqual(actual,expected);}
- private token(a:Admin){const h=Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url');const p=Buffer.from(JSON.stringify({sub:a.id,scope:'ara_platform',role:a.role,iat:Math.floor(Date.now()/1000),exp:Math.floor(Date.now()/1000)+900})).toString('base64url');const secret=this.config.get('JWT_SECRET');if(!secret||secret.length<32)throw new UnauthorizedException('Authentication is not configured');return h+'.'+p+'.'+createHmac('sha256',secret).update(h+'.'+p).digest('base64url');}
+ private token(a:Admin){const h=Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url');const p=Buffer.from(JSON.stringify({sub:a.id,scope:'ara_platform',role:a.role,iat:Math.floor(Date.now()/1000),exp:Math.floor(Date.now()/1000)+900,otp:true})).toString('base64url');const secret=this.config.get('JWT_SECRET');if(!secret||secret.length<32)throw new UnauthorizedException('Authentication is not configured');return h+'.'+p+'.'+createHmac('sha256',secret).update(h+'.'+p).digest('base64url');}
  private requireRole(a:Admin,roles:string[]){if(!roles.includes(a.role))throw new ForbiddenException('Insufficient platform role');}
  async login(body:any){
   const email=String(body?.email||'').trim().toLowerCase(),password=String(body?.password||'');
@@ -29,6 +29,7 @@ export class PlatformAdminService implements OnApplicationBootstrap {
   const row=r.rows[0];if(!row||!(await this.verify(password,row.password_hash)))throw new UnauthorizedException('Invalid platform administrator credentials');
   return this.otp.issue(row.email,row.id,'admin_auth');
  }
+ async resendLoginOtp(body:any){return this.otp.resend(body?.challengeId,'admin_auth');}
  async verifyLoginOtp(body:any){
   const verified=await this.otp.verify(body?.challengeId,body?.code,'admin_auth');
   const r=await this.db.query('SELECT id,email,full_name AS "fullName",role FROM platform_admin_users WHERE id=$1 AND lower(email)=lower($2) AND is_active=true',[verified.principalId,verified.email]);
