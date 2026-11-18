@@ -30,6 +30,8 @@ jobs:
         with:
           node-version: 20
       - run: npm install --no-audit --no-fund
+      - name: Build public marketing website
+        run: npm --prefix apps/marketing install --include=dev --no-audit --no-fund && npm --prefix apps/marketing run build
       - name: Validate Company CRM JavaScript
         run: node --check apps/company-crm/app.js && node --check apps/company-crm/config.js
       - name: Validate Super Admin JavaScript
