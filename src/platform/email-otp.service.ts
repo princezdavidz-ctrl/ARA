@@ -1,4 +1,4 @@
-import { Injectable, ServiceUnavailableException, TooManyRequestsException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, HttpException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { createHmac, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
 import { DatabaseService } from '../database/database.service';
 import { ConfigService } from '../config/config.service';
@@ -23,7 +23,7 @@ export class EmailOtpService {
       'SELECT sent_at FROM auth_email_otps WHERE lower(email)=lower($1) AND purpose=$2 AND sent_at>now()-interval \'60 seconds\' ORDER BY sent_at DESC LIMIT 1',
       [email, purpose],
     );
-    if (recent.rowCount) throw new TooManyRequestsException('Please wait 60 seconds before requesting another code.');
+    if (recent.rowCount) throw new HttpException('Please wait 60 seconds before requesting another code.', 429);
     const code = String(randomInt(0, 1000000)).padStart(6, '0');
     const challengeId = randomUUID();
     await this.db.query(
