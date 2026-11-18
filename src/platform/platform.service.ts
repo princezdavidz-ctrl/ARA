@@ -26,7 +26,7 @@ export class PlatformService implements OnApplicationBootstrap {
   private slug(s:string){return s.toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,48);}
   private async hashPassword(password:string){const salt=randomBytes(16);const key=await scrypt(password,salt,64) as Buffer;return 'scrypt$'+salt.toString('hex')+'$'+key.toString('hex');}
   private async verifyPassword(password:string,stored:string){const [kind,saltHex,keyHex]=stored.split('$');if(kind!=='scrypt'||!saltHex||!keyHex)return false;const key=await scrypt(password,Buffer.from(saltHex,'hex'),64) as Buffer;const expected=Buffer.from(keyHex,'hex');return key.length===expected.length&&timingSafeEqual(key,expected);}
-  private accessToken(u:User){const h=Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url');const p=Buffer.from(JSON.stringify({sub:u.id,agencyId:u.agencyId,role:u.role,iat:Math.floor(Date.now()/1000),exp:Math.floor(Date.now()/1000)+900})).toString('base64url');const sig=createHmac('sha256',this.config.get('JWT_SECRET')).update(h+'.'+p).digest('base64url');return h+'.'+p+'.'+sig;}
+  private accessToken(u:User){const h=Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url');const p=Buffer.from(JSON.stringify({sub:u.id,agencyId:u.agencyId,role:u.role,iat:Math.floor(Date.now()/1000),exp:Math.floor(Date.now()/1000)+900,otp:true})).toString('base64url');const sig=createHmac('sha256',this.config.get('JWT_SECRET')).update(h+'.'+p).digest('base64url');return h+'.'+p+'.'+sig;}
   private async audit(agencyId:string,actor:string|null,action:string,type:string,id:string|null,details:Record<string,unknown>={}){await this.db.query('INSERT INTO audit_logs(agency_id,actor_user_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5,$6)',[agencyId,actor,action,type,id,JSON.stringify(details)]);}
   async register(body:any){
     const name=String(body?.agencyName||'').trim(),fullName=String(body?.fullName||'').trim(),email=String(body?.email||'').trim().toLowerCase(),password=String(body?.password||'');
@@ -75,6 +75,8 @@ export class PlatformService implements OnApplicationBootstrap {
     const row=r.rows[0];if(!row||!(await this.verifyPassword(password,row.password_hash)))throw new UnauthorizedException('Invalid email, password or agency');
     return this.otp.issue(row.email,row.id,'company_auth');
   }
+
+  async resendLoginOtp(body:any){return this.otp.resend(body?.challengeId,'company_auth');}
 
   async verifyLoginOtp(body:any){
     const verified=await this.otp.verify(body?.challengeId,body?.code,'company_auth');
