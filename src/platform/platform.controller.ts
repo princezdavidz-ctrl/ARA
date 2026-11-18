@@ -6,6 +6,8 @@ export class PlatformController {
   constructor(private readonly platform:PlatformService){}
   @Post('register') register(@Body() body:unknown){return this.platform.register(body);}
   @Post('login') login(@Body() body:unknown){return this.platform.login(body);}
+  @Post('verify-otp') verifyOtp(@Body() body:unknown){return this.platform.verifyLoginOtp(body);}
+  @Post('resend-otp') resendOtp(@Body() body:any){return this.platform.resendLoginOtp(body);}
   @Post('owner-password-reset') resetOwnerPassword(@Body() body:unknown){return this.platform.resetOwnerPassword(body);}
   @Post('refresh') refresh(@Body() body:any){return this.platform.refresh(String(body?.refreshToken||''));}
   @Post('logout') logout(@Body() body:any){return this.platform.logout(String(body?.refreshToken||''));}

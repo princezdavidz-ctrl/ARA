@@ -21,7 +21,7 @@ export class AuthGuard implements CanActivate {
     const expected = createHmac('sha256', secret).update(parts[0] + '.' + parts[1]).digest();
     const supplied = Buffer.from(parts[2], 'base64url');
     if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) throw new UnauthorizedException('Invalid access token');
-    if (!claims.sub || !claims.agencyId || !Number.isInteger(claims.exp) || claims.exp <= Math.floor(Date.now() / 1000)) throw new UnauthorizedException('Expired or invalid access token');
+    if (claims.otp !== true || !claims.sub || !claims.agencyId || !Number.isInteger(claims.exp) || claims.exp <= Math.floor(Date.now() / 1000)) throw new UnauthorizedException('Expired or invalid access token');
     const result = await this.db.query<AraUser>(`SELECT u.id, u.agency_id AS "agencyId", u.role, u.email, u.full_name AS "fullName"
       FROM agency_users u JOIN agencies a ON a.id = u.agency_id
       WHERE u.id = $1 AND u.agency_id = $2 AND u.is_active = true AND a.is_active = true`,

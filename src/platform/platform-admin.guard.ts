@@ -11,7 +11,7 @@ export class PlatformAdminGuard implements CanActivate {
   if(!header?.startsWith('Bearer ')) throw new UnauthorizedException('Platform bearer token required');
   const parts=header.slice(7).split('.'); if(parts.length!==3) throw new UnauthorizedException('Invalid platform access token');
   let h:any,p:any; try { h=JSON.parse(Buffer.from(parts[0],'base64url').toString()); p=JSON.parse(Buffer.from(parts[1],'base64url').toString()); } catch { throw new UnauthorizedException('Invalid platform access token'); }
-  if(h?.alg!=='HS256'||h?.typ!=='JWT'||p?.scope!=='ara_platform'||!p?.sub||!Number.isInteger(p?.exp)||p.exp<=Math.floor(Date.now()/1000)) throw new UnauthorizedException('Invalid or expired platform access token');
+  if(h?.alg!=='HS256'||h?.typ!=='JWT'||p?.scope!=='ara_platform'||p?.otp!==true||!p?.sub||!Number.isInteger(p?.exp)||p.exp<=Math.floor(Date.now()/1000)) throw new UnauthorizedException('Invalid or expired platform access token');
   const secret=this.config.get('JWT_SECRET'); if(!secret||secret.length<32) throw new UnauthorizedException('Authentication is not configured');
   const expected=createHmac('sha256',secret).update(parts[0]+'.'+parts[1]).digest(), supplied=Buffer.from(parts[2],'base64url');
   if(supplied.length!==expected.length||!timingSafeEqual(supplied,expected)) throw new UnauthorizedException('Invalid platform access token');
