@@ -13,3 +13,6 @@ CREATE INDEX IF NOT EXISTS auth_email_otps_email_purpose_sent_idx
   ON auth_email_otps(lower(email), purpose, sent_at DESC);
 CREATE INDEX IF NOT EXISTS auth_email_otps_expiry_idx
   ON auth_email_otps(expires_at);
+
+-- Existing sessions were authenticated before mandatory OTP and must sign in again.
+UPDATE refresh_sessions SET revoked_at=now() WHERE revoked_at IS NULL;
