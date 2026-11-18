@@ -46,7 +46,7 @@ async function logout(){
   try{if(refresh)await fetch(url('/platform/logout'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refreshToken:refresh})});}catch(e){}
   token='';refresh='';user=null;sessionStorage.removeItem('ara_crm_token');sessionStorage.removeItem('ara_crm_refresh');sessionStorage.removeItem('ara_crm_user');loginView();
 }
-function pageTitle(title,subtitle){document.getElementById('page-title').textContent=title;document.getElementById('page-subtitle').textContent=subtitle;app.querySelectorAll('[data-page]').forEach(function(b){b.classList.toggle('active',b.dataset.page===page);});}
+function pageTitle(title,subtitle){document.getElementById('page-title').textContent=title;document.getElementById('page-subtitle').textContent=subtitle;app.querySelectorAll('[data-page]').forEach(function(b){b.classList.toggle('active',b.dataset.page===page);});var mobilePage=document.getElementById('mobile-page');if(mobilePage)mobilePage.value=page;}
 function table(headers,rows){return '<div class="panel table-wrap"><table class="data"><thead><tr>'+headers.map(function(h){return '<th>'+h+'</th>';}).join('')+'</tr></thead><tbody>'+(rows.length?rows.join(''):'<tr><td class="empty" colspan="'+headers.length+'">No records found</td></tr>')+'</tbody></table></div>';}
 async function loadPage(){
   var content=document.getElementById('content');content.innerHTML='<div class="empty">Loading…</div>';
