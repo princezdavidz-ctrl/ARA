@@ -16,8 +16,8 @@ export class EmailOtpService {
   async issue(emailValue: string, principalId: string, purpose: OtpPurpose) {
     const email = String(emailValue || '').trim().toLowerCase();
     if (!/^\S+@\S+\.\S+$/.test(email)) throw new UnauthorizedException('A valid account email is required');
-    const apiKey = this.config.get('ARA_AUTH_EMAIL_API_KEY');
-    const from = this.config.get('ARA_AUTH_EMAIL_FROM');
+    const apiKey = this.config.get('ARA_AUTH_EMAIL_API_KEY') || this.config.get('EMAIL_RESEND_API_KEY');
+    const from = this.config.get('ARA_AUTH_EMAIL_FROM') || this.config.get('EMAIL_FROM_ADDRESS');
     if (!apiKey || !from) throw new ServiceUnavailableException('Email verification is not configured. Contact the platform administrator.');
     const recent = await this.db.query(
       'SELECT sent_at FROM auth_email_otps WHERE lower(email)=lower($1) AND purpose=$2 AND sent_at>now()-interval \'60 seconds\' ORDER BY sent_at DESC LIMIT 1',
