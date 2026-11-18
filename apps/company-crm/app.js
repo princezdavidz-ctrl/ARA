@@ -141,7 +141,7 @@ function registerView(){
     setError('register-error','');
     if(data.get('password')!==data.get('confirmPassword')){setError('register-error','Passwords do not match.');return;}
     button.disabled=true;
-    try{var result=await api('/platform/register',{method:'POST',body:JSON.stringify({agencyName:data.get('agencyName'),fullName:data.get('fullName'),email:data.get('email'),password:data.get('password')})});save(result);history.replaceState(null,'',location.pathname);renderShell();}
+    try{var result=await api('/platform/register',{method:'POST',body:JSON.stringify({agencyName:data.get('agencyName'),fullName:data.get('fullName'),email:data.get('email'),password:data.get('password')})});companyOtpView(result);}
     catch(error){setError('register-error',error);}
     finally{button.disabled=false;}
   });
