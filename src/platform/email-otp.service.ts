@@ -1,5 +1,6 @@
 import { Injectable, HttpException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { createHmac, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
+import nodemailer from 'nodemailer';
 import { DatabaseService } from '../database/database.service';
 import { ConfigService } from '../config/config.service';
 
@@ -16,14 +17,23 @@ export class EmailOtpService {
   async issue(emailValue: string, principalId: string, purpose: OtpPurpose) {
     const email = String(emailValue || '').trim().toLowerCase();
     if (!/^\S+@\S+\.\S+$/.test(email)) throw new UnauthorizedException('A valid account email is required');
-    const apiKey = this.config.get('ARA_AUTH_EMAIL_API_KEY') || this.config.get('EMAIL_RESEND_API_KEY');
-    const from = this.config.get('ARA_AUTH_EMAIL_FROM') || this.config.get('EMAIL_FROM_ADDRESS');
-    if (!apiKey || !from) throw new ServiceUnavailableException('Email verification is not configured. Contact the platform administrator.');
+
+    const smtpHost = this.config.get('SMTP_HOST');
+    const smtpPort = this.config.get('SMTP_PORT');
+    const smtpSecure = this.config.get('SMTP_SECURE');
+    const smtpUser = this.config.get('SMTP_USER');
+    const smtpPass = this.config.get('SMTP_PASS');
+    const from = this.config.get('ARA_AUTH_EMAIL_FROM') || smtpUser;
+    if (!smtpHost || !smtpPort || !smtpUser || !smtpPass || !from) {
+      throw new ServiceUnavailableException('Gmail SMTP is not configured. Contact the platform administrator.');
+    }
+
     const recent = await this.db.query(
       'SELECT sent_at FROM auth_email_otps WHERE lower(email)=lower($1) AND purpose=$2 AND sent_at>now()-interval \'60 seconds\' ORDER BY sent_at DESC LIMIT 1',
       [email, purpose],
     );
     if (recent.rowCount) throw new HttpException('Please wait 60 seconds before requesting another code.', 429);
+
     const code = String(randomInt(0, 1000000)).padStart(6, '0');
     const challengeId = randomUUID();
     await this.db.query(
@@ -34,27 +44,31 @@ export class EmailOtpService {
       'INSERT INTO auth_email_otps(id,email,purpose,principal_id,code_hash,expires_at,sent_at) VALUES($1,$2,$3,$4,$5,now()+interval \'5 minutes\',now())',
       [challengeId, email, purpose, principalId, this.digest(challengeId, code)],
     );
+
     try {
-      const response = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          from,
-          to: [email],
-          subject: 'Your ARA verification code',
-          text: 'Your ARA verification code is ' + code + '. It expires in 5 minutes. If you did not request this code, you can ignore this email.',
-          html: '<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:32px;color:#172033"><h2>Verify your ARA sign-in</h2><p>Enter this one-time code to continue:</p><div style="font-size:32px;font-weight:700;letter-spacing:8px;padding:18px;background:#f2f5fa;border-radius:12px;text-align:center">' + code + '</div><p>This code expires in 5 minutes and can only be used once.</p><p>If you did not request this code, ignore this email.</p></div>',
-        }),
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpSecure,
+        requireTLS: !smtpSecure,
+        auth: { user: smtpUser, pass: smtpPass },
+        connectionTimeout: 15000,
+        greetingTimeout: 15000,
+        socketTimeout: 20000,
       });
-      if (!response.ok) {
-        await this.db.query('UPDATE auth_email_otps SET consumed_at=now() WHERE id=$1', [challengeId]);
-        throw new ServiceUnavailableException('We could not send the verification email. Please try again later.');
-      }
-    } catch (error) {
+      await transporter.sendMail({
+        from: { name: 'ARA', address: from },
+        to: email,
+        subject: 'Your ARA verification code',
+        text: 'Your ARA verification code is ' + code + '. It expires in 5 minutes. If you did not request this code, you can ignore this email.',
+        html: '<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:32px;color:#172033"><h2>Verify your ARA sign-in</h2><p>Enter this one-time code to continue:</p><div style="font-size:32px;font-weight:700;letter-spacing:8px;padding:18px;background:#f2f5fa;border-radius:12px;text-align:center">' + code + '</div><p>This code expires in 5 minutes and can only be used once.</p><p>If you did not request this code, ignore this email.</p></div>',
+      });
+      transporter.close();
+    } catch {
       await this.db.query('UPDATE auth_email_otps SET consumed_at=now() WHERE id=$1', [challengeId]);
-      if (error instanceof ServiceUnavailableException) throw error;
-      throw new ServiceUnavailableException('We could not send the verification email. Please try again later.');
+      throw new ServiceUnavailableException('We could not send the verification email through Gmail. Check the SMTP configuration and try again.');
     }
+
     return { requiresOtp: true, challengeId, email, expiresIn: 300, resendAfter: 60, message: 'A six-digit verification code has been sent to your email.' };
   }
 
