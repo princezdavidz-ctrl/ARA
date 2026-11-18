@@ -1,0 +1,6 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@layer base{html{scroll-behavior:smooth}body{@apply bg-ink-950 text-ink-100 font-sans antialiased;-webkit-font-smoothing:antialiased}::selection{@apply bg-brand-500/30 text-white}}
+@layer components{.container-px{@apply mx-auto w-full max-w-8xl px-5 sm:px-8 lg:px-12}.gradient-text{@apply bg-gradient-to-br from-white via-brand-200 to-brand-400 bg-clip-text text-transparent}.glass{@apply border border-white/10 bg-white/[0.04] backdrop-blur-xl}.card-glow{position:relative}.card-glow::before{content:'';position:absolute;inset:-1px;border-radius:inherit;padding:1px;background:linear-gradient(140deg,rgba(16,184,132,.5),transparent 40%,rgba(34,211,238,.25));-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:0;transition:opacity .4s ease;pointer-events:none}.card-glow:hover::before{opacity:1}}
+@layer utilities{.grid-bg{background-image:linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px);background-size:56px 56px}.radial-fade{-webkit-mask-image:radial-gradient(ellipse 70% 60% at 50% 0%,#000 40%,transparent 100%);mask-image:radial-gradient(ellipse 70% 60% at 50% 0%,#000 40%,transparent 100%)}}
