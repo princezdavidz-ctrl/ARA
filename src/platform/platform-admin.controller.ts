@@ -6,6 +6,7 @@ import { AiUsageService } from './ai-usage.service';
 export class PlatformAdminController {
  constructor(private readonly adminService:PlatformAdminService,private readonly aiUsage:AiUsageService){}
  @Post('auth/login') login(@Body() body:unknown){return this.adminService.login(body);}
+ @Post('auth/verify-otp') verifyOtp(@Body() body:unknown){return this.adminService.verifyLoginOtp(body);}
  @UseGuards(PlatformAdminGuard) @Get('ai-usage') aiUsageDashboard(@Req() req:{platformAdmin:PlatformAdmin},@Query('days') days?:string){return this.aiUsage.platformDashboard(req.platformAdmin,days);}
  @UseGuards(PlatformAdminGuard) @Get('overview') overview(@Req() req:{platformAdmin:PlatformAdmin}){return this.adminService.overview(req.platformAdmin);}
  @UseGuards(PlatformAdminGuard) @Get('companies') companies(@Req() req:{platformAdmin:PlatformAdmin},@Query() query:unknown){return this.adminService.companies(req.platformAdmin,query);}
