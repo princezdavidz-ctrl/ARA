@@ -3,11 +3,12 @@ import { createHmac, randomBytes, scrypt as scryptCb, timingSafeEqual } from 'no
 import { promisify } from 'node:util';
 import { DatabaseService } from '../database/database.service';
 import { ConfigService } from '../config/config.service';
+import { EmailOtpService } from './email-otp.service';
 const scrypt=promisify(scryptCb);
 type Admin={id:string;email:string;fullName:string;role:string};
 @Injectable()
 export class PlatformAdminService implements OnApplicationBootstrap {
- constructor(private readonly db:DatabaseService,private readonly config:ConfigService){}
+ constructor(private readonly db:DatabaseService,private readonly config:ConfigService,private readonly otp:EmailOtpService){}
  async onApplicationBootstrap(){
   const password=process.env.ARA_BOOTSTRAP_PLATFORM_ADMIN_PASSWORD; if(!password)return;
   const email=String(process.env.ARA_BOOTSTRAP_PLATFORM_ADMIN_EMAIL||'').trim().toLowerCase();
@@ -21,7 +22,20 @@ export class PlatformAdminService implements OnApplicationBootstrap {
  private async verify(password:string,stored:string){const [kind,salt,keyHex]=stored.split('$');if(kind!=='scrypt'||!salt||!keyHex)return false;const actual=await scrypt(password,Buffer.from(salt,'hex'),64) as Buffer,expected=Buffer.from(keyHex,'hex');return actual.length===expected.length&&timingSafeEqual(actual,expected);}
  private token(a:Admin){const h=Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url');const p=Buffer.from(JSON.stringify({sub:a.id,scope:'ara_platform',role:a.role,iat:Math.floor(Date.now()/1000),exp:Math.floor(Date.now()/1000)+900})).toString('base64url');const secret=this.config.get('JWT_SECRET');if(!secret||secret.length<32)throw new UnauthorizedException('Authentication is not configured');return h+'.'+p+'.'+createHmac('sha256',secret).update(h+'.'+p).digest('base64url');}
  private requireRole(a:Admin,roles:string[]){if(!roles.includes(a.role))throw new ForbiddenException('Insufficient platform role');}
- async login(body:any){const email=String(body?.email||'').trim().toLowerCase(),password=String(body?.password||'');if(!email||!password)throw new BadRequestException('Email and password are required');const r=await this.db.query('SELECT id,email,full_name AS "fullName",role,password_hash FROM platform_admin_users WHERE lower(email)=$1 AND is_active=true',[email]);const row=r.rows[0];if(!row||!(await this.verify(password,row.password_hash)))throw new UnauthorizedException('Invalid platform administrator credentials');const admin={id:row.id,email:row.email,fullName:row.fullName,role:row.role};return {admin,accessToken:this.token(admin),expiresIn:900};}
+ async login(body:any){
+  const email=String(body?.email||'').trim().toLowerCase(),password=String(body?.password||'');
+  if(!email||!password)throw new BadRequestException('Email and password are required');
+  const r=await this.db.query('SELECT id,email,password_hash FROM platform_admin_users WHERE lower(email)=$1 AND is_active=true',[email]);
+  const row=r.rows[0];if(!row||!(await this.verify(password,row.password_hash)))throw new UnauthorizedException('Invalid platform administrator credentials');
+  return this.otp.issue(row.email,row.id,'admin_auth');
+ }
+ async verifyLoginOtp(body:any){
+  const verified=await this.otp.verify(body?.challengeId,body?.code,'admin_auth');
+  const r=await this.db.query('SELECT id,email,full_name AS "fullName",role FROM platform_admin_users WHERE id=$1 AND lower(email)=lower($2) AND is_active=true',[verified.principalId,verified.email]);
+  const row=r.rows[0];if(!row)throw new UnauthorizedException('Platform administrator is inactive or unavailable');
+  const admin={id:row.id,email:row.email,fullName:row.fullName,role:row.role};
+  return {admin,accessToken:this.token(admin),expiresIn:900};
+ }
  async overview(a:Admin){this.requireRole(a,['super_admin','platform_support','billing_admin','security_auditor']);const r=await this.db.query("SELECT (SELECT count(*)::int FROM agencies) AS companies,(SELECT count(*)::int FROM agencies WHERE is_active=true) AS active_companies,(SELECT count(*)::int FROM company_subscriptions WHERE status IN ('active','trialing')) AS active_subscriptions,(SELECT count(*)::int FROM channel_connections WHERE status='active') AS active_channels,(SELECT coalesce(sum(quantity),0)::bigint FROM usage_records WHERE occurred_at>=date_trunc('month',now())) AS month_usage");return r.rows[0];}
  async companies(a:Admin,query:any){this.requireRole(a,['super_admin','platform_support','billing_admin','security_auditor']);const limit=Math.min(100,Math.max(1,Number(query?.limit)||25)),offset=Math.max(0,Number(query?.offset)||0),term=String(query?.q||'').trim().slice(0,100);const r=await this.db.query("SELECT ag.id,ag.name,ag.slug,ag.is_active AS \"isActive\",ag.created_at AS \"createdAt\",cs.industry,cs.timezone,(SELECT count(*)::int FROM agency_users u WHERE u.agency_id=ag.id AND u.is_active=true) AS \"activeUsers\",(SELECT s.status FROM company_subscriptions s WHERE s.agency_id=ag.id ORDER BY s.created_at DESC LIMIT 1) AS \"subscriptionStatus\" FROM agencies ag LEFT JOIN company_settings cs ON cs.agency_id=ag.id WHERE ($1='' OR ag.name ILIKE '%'||$1||'%' OR ag.slug ILIKE '%'||$1||'%') ORDER BY ag.created_at DESC LIMIT $2 OFFSET $3",[term,limit,offset]);return {items:r.rows,limit,offset};}
  async company(a:Admin,id:string){this.requireRole(a,['super_admin','platform_support','billing_admin','security_auditor']);if(!/^[0-9a-f-]{36}$/i.test(id))throw new BadRequestException('Invalid company ID');const r=await this.db.query("SELECT ag.id,ag.name,ag.slug,ag.is_active AS \"isActive\",ag.created_at AS \"createdAt\",cs.industry,cs.display_name AS \"displayName\",cs.timezone,cs.default_language AS \"defaultLanguage\",(SELECT count(*)::int FROM agency_users u WHERE u.agency_id=ag.id) AS \"totalUsers\",(SELECT count(*)::int FROM channel_connections ch WHERE ch.agency_id=ag.id) AS \"channelConnections\",(SELECT jsonb_build_object('id',s.id,'status',s.status,'plan',p.name,'periodEnd',s.current_period_end) FROM company_subscriptions s JOIN subscription_plans p ON p.id=s.plan_id WHERE s.agency_id=ag.id ORDER BY s.created_at DESC LIMIT 1) AS subscription FROM agencies ag LEFT JOIN company_settings cs ON cs.agency_id=ag.id WHERE ag.id=$1",[id]);if(!r.rowCount)throw new NotFoundException('Company not found');await this.db.query('INSERT INTO platform_audit_logs(platform_admin_id,agency_id,action,target_type,target_id) VALUES($1,$2,$3,$4,$5)',[a.id,id,'company.viewed','company',id]);return r.rows[0];}
