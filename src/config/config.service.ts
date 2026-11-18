@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 const optionalSecret = z.preprocess(value => value === '' ? undefined : value, z.string().min(20).optional());
 const optionalRate = z.preprocess(value => value === '' || value === undefined ? undefined : value, z.coerce.number().min(0).optional());
+const optionalText = z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional());
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
@@ -30,8 +31,12 @@ const schema = z.object({
   WHATSAPP_VERIFY_TOKEN: z.preprocess(value => value === '' ? undefined : value, z.string().min(32).optional()),
   WHATSAPP_APP_SECRET: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
   WHATSAPP_ACCESS_TOKEN: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
-  ARA_AUTH_EMAIL_API_KEY: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
   ARA_AUTH_EMAIL_FROM: z.preprocess(value => value === '' ? undefined : value, z.string().email().optional()),
+  SMTP_HOST: optionalText,
+  SMTP_PORT: z.preprocess(value => value === '' || value === undefined ? undefined : value, z.coerce.number().int().min(1).max(65535).optional()),
+  SMTP_SECURE: z.preprocess(value => value === 'true' || value === true, z.boolean()).default(false),
+  SMTP_USER: z.preprocess(value => value === '' ? undefined : value, z.string().email().optional()),
+  SMTP_PASS: z.preprocess(value => value === '' ? undefined : value, z.string().min(16).optional()),
   EMAIL_AGENCY_ID: z.preprocess(value => value === '' ? undefined : value, z.string().uuid().optional()),
   EMAIL_RESEND_API_KEY: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
   EMAIL_FROM_ADDRESS: z.preprocess(value => value === '' ? undefined : value, z.string().email().optional()),
@@ -42,7 +47,7 @@ const schema = z.object({
   INSTAGRAM_APP_SECRET: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
   INSTAGRAM_VERIFY_TOKEN: z.preprocess(value => value === '' ? undefined : value, z.string().min(32).optional()),
   INSTAGRAM_API_VERSION: z.string().regex(/^v\d+\.\d+$/).default('v26.0'),
-  TIKTOK_AGENCY_ID: z.preprocess(value => value === '' ? undefined : value, z.string().uuid().optional()),
+  TIKTOK_AGENCY_ID: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
   TIKTOK_BUSINESS_ID: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
   TIKTOK_ACCESS_TOKEN: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
   TIKTOK_WEBHOOK_SECRET: z.preprocess(value => value === '' ? undefined : value, z.string().min(32).optional()),
@@ -70,7 +75,9 @@ export class ConfigService implements OnModuleInit {
       throw new Error('Legacy single-tenant WhatsApp configuration requires WHATSAPP_AGENCY_ID, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_VERIFY_TOKEN and WHATSAPP_APP_SECRET together.');
     }
     if (wa.WHATSAPP_ACCESS_TOKEN && !(wa.WHATSAPP_AGENCY_ID && wa.WHATSAPP_PHONE_NUMBER_ID)) throw new Error('Outbound WhatsApp delivery requires WHATSAPP_AGENCY_ID and WHATSAPP_PHONE_NUMBER_ID.');
-    if (Boolean(wa.ARA_AUTH_EMAIL_API_KEY) !== Boolean(wa.ARA_AUTH_EMAIL_FROM)) throw new Error('ARA auth email requires both ARA_AUTH_EMAIL_API_KEY and ARA_AUTH_EMAIL_FROM.');
+    const smtpAny = Boolean(wa.SMTP_HOST || wa.SMTP_PORT || wa.SMTP_USER || wa.SMTP_PASS || wa.ARA_AUTH_EMAIL_FROM);
+    if (smtpAny && !(wa.SMTP_HOST && wa.SMTP_PORT && wa.SMTP_USER && wa.SMTP_PASS)) throw new Error('ARA OTP email requires SMTP_HOST, SMTP_PORT, SMTP_USER and SMTP_PASS together.');
+    if (wa.ARA_AUTH_EMAIL_FROM && !wa.SMTP_USER) throw new Error('ARA_AUTH_EMAIL_FROM requires SMTP_USER.');
     const emailAny = Boolean(wa.EMAIL_AGENCY_ID || wa.EMAIL_RESEND_API_KEY || wa.EMAIL_FROM_ADDRESS || wa.EMAIL_WEBHOOK_SECRET);
     if (emailAny && !(wa.EMAIL_AGENCY_ID && wa.EMAIL_RESEND_API_KEY && wa.EMAIL_FROM_ADDRESS && wa.EMAIL_WEBHOOK_SECRET)) throw new Error('Email channel requires EMAIL_AGENCY_ID, EMAIL_RESEND_API_KEY, EMAIL_FROM_ADDRESS and EMAIL_WEBHOOK_SECRET together.');
     const legacyInstagramConfigured = Boolean(wa.INSTAGRAM_AGENCY_ID || wa.INSTAGRAM_ACCOUNT_ID || wa.INSTAGRAM_ACCESS_TOKEN || wa.INSTAGRAM_VERIFY_TOKEN);
