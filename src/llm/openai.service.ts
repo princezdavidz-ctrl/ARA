@@ -1,4 +1,6 @@
-import { Injectable, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { createDecipheriv } from 'node:crypto';
+import { DatabaseService } from '../database/database.service';
 import OpenAI from 'openai';
 import { ConfigService } from '../config/config.service';
 
@@ -17,24 +19,25 @@ export interface OpenAiGenerationResult {
 }
 
 @Injectable()
-export class OpenAiService implements OnModuleInit {
-  private client?: OpenAI;
-  constructor(private config: ConfigService) {}
-  onModuleInit(): void {
-    const apiKey = this.config.get('OPENAI_API_KEY');
-    if (apiKey) this.client = new OpenAI({
-      apiKey,
-      timeout: this.config.get('OPENAI_TIMEOUT_MS'),
-      maxRetries: this.config.get('OPENAI_MAX_RETRIES'),
-    });
+export class OpenAiService {
+  constructor(private config: ConfigService, private db: DatabaseService) {}
+  private decryptCredentials(data: Buffer): Record<string,string> {
+    const raw=String(this.config.get('ARA_CHANNEL_ENCRYPTION_KEY')||'').trim();
+    const key=/^[0-9a-f]{64}$/i.test(raw)?Buffer.from(raw,'hex'):Buffer.from(raw,'base64');
+    if(key.length!==32||!Buffer.isBuffer(data)||data.length<32||data.subarray(0,4).toString()!=='ARA1')throw new ServiceUnavailableException('AI provider credentials cannot be decrypted.');
+    try{const decipher=createDecipheriv('aes-256-gcm',key,data.subarray(4,16));decipher.setAuthTag(data.subarray(16,32));return JSON.parse(Buffer.concat([decipher.update(data.subarray(32)),decipher.final()]).toString('utf8'));}
+    catch{throw new ServiceUnavailableException('AI provider credentials cannot be decrypted.');}
   }
-  private requireClient(): OpenAI {
-    if (!this.client) throw new ServiceUnavailableException('AI is not configured yet. Add OPENAI_API_KEY to the deployment environment.');
-    return this.client;
+  private async requireClient(): Promise<OpenAI> {
+    const saved=await this.db.query<any>("SELECT encrypted_credentials FROM platform_integrations WHERE provider='openai' AND is_enabled=true");
+    let apiKey=String(this.config.get('OPENAI_API_KEY')||'');
+    if(saved.rowCount)apiKey=String(this.decryptCredentials(saved.rows[0].encrypted_credentials).apiKey||'');
+    if(!apiKey)throw new ServiceUnavailableException('AI is not configured yet. Add an OpenAI key in Super Admin AI Control.');
+    return new OpenAI({apiKey,timeout:this.config.get('OPENAI_TIMEOUT_MS'),maxRetries:this.config.get('OPENAI_MAX_RETRIES')});
   }
   async embedWithUsage(texts: string[]): Promise<OpenAiEmbeddingResult> {
     const model = this.config.get('OPENAI_EMBEDDING_MODEL');
-    const response = await this.requireClient().embeddings.create({ model, input: texts });
+    const response = await (await this.requireClient()).embeddings.create({ model, input: texts });
     return {
       embeddings: response.data.sort((a, b) => a.index - b.index).map(item => item.embedding),
       model: response.model || model,
@@ -46,7 +49,7 @@ export class OpenAiService implements OnModuleInit {
     return response.embeddings;
   }
   async generateWithUsage(system: string, user: string): Promise<OpenAiGenerationResult> {
-    const response = await this.requireClient().chat.completions.create({
+    const response = await (await this.requireClient()).chat.completions.create({
       model: this.config.get('OPENAI_CHAT_MODEL'), temperature: 0, response_format: { type: 'json_object' },
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
     });
