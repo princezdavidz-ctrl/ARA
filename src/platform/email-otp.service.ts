@@ -58,29 +58,42 @@ export class EmailOtpService {
     return { requiresOtp: true, challengeId, email, expiresIn: 300, resendAfter: 60, message: 'A six-digit verification code has been sent to your email.' };
   }
 
+  async resend(challengeIdValue: string, purpose: OtpPurpose) {
+    const challengeId = String(challengeIdValue || '');
+    if (!/^[0-9a-f-]{36}$/i.test(challengeId)) throw new UnauthorizedException('Verification request is invalid.');
+    const row = await this.db.query(
+      'SELECT email,principal_id AS "principalId" FROM auth_email_otps WHERE id=$1 AND purpose=$2 AND consumed_at IS NULL AND expires_at>now()',
+      [challengeId, purpose],
+    );
+    if (!row.rowCount) throw new UnauthorizedException('This verification request has expired. Sign in again.');
+    return this.issue(row.rows[0].email, row.rows[0].principalId, purpose);
+  }
+
   async verify(challengeIdValue: string, codeValue: string, purpose: OtpPurpose) {
     const challengeId = String(challengeIdValue || '');
     const code = String(codeValue || '').trim();
     if (!/^[0-9a-f-]{36}$/i.test(challengeId) || !/^\d{6}$/.test(code)) throw new UnauthorizedException('Enter the six-digit verification code.');
-    return this.db.transaction(async client => {
+    const outcome = await this.db.transaction(async client => {
       const result = await client.query(
         'SELECT id,email,purpose,principal_id AS "principalId",code_hash AS "codeHash",expires_at AS "expiresAt",attempts,consumed_at AS "consumedAt" FROM auth_email_otps WHERE id=$1 AND purpose=$2 FOR UPDATE',
         [challengeId, purpose],
       );
       const row = result.rows[0];
-      if (!row || row.consumedAt || new Date(row.expiresAt).getTime() <= Date.now()) throw new UnauthorizedException('This verification code has expired. Request a new one.');
+      if (!row || row.consumedAt || new Date(row.expiresAt).getTime() <= Date.now()) return { error: 'This verification code has expired. Request a new one.' };
       if (Number(row.attempts) >= 5) {
         await client.query('UPDATE auth_email_otps SET consumed_at=now() WHERE id=$1', [challengeId]);
-        throw new UnauthorizedException('Too many incorrect attempts. Request a new code.');
+        return { error: 'Too many incorrect attempts. Request a new code.' };
       }
       const actual = Buffer.from(this.digest(challengeId, code), 'hex');
       const expected = Buffer.from(row.codeHash, 'hex');
       if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
-        await client.query('UPDATE auth_email_otps SET attempts=attempts+1 WHERE id=$1', [challengeId]);
-        throw new UnauthorizedException('Incorrect verification code.');
+        await client.query('UPDATE auth_email_otps SET attempts=attempts+1, consumed_at=CASE WHEN attempts+1>=5 THEN now() ELSE consumed_at END WHERE id=$1', [challengeId]);
+        return { error: 'Incorrect verification code.' };
       }
       await client.query('UPDATE auth_email_otps SET consumed_at=now() WHERE id=$1', [challengeId]);
       return { principalId: row.principalId, email: row.email };
     });
+    if ('error' in outcome) throw new UnauthorizedException(outcome.error);
+    return outcome;
   }
 }
