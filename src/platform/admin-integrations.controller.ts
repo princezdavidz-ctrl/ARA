@@ -5,6 +5,9 @@ import { AdminIntegrationsService } from './admin-integrations.service';
 @UseGuards(PlatformAdminGuard)
 export class AdminIntegrationsController {
  constructor(private readonly service:AdminIntegrationsService){}
+ @Get('ai/providers') aiProviders(@Req() req:{platformAdmin:PlatformAdmin}){return this.service.aiProviderStatus(req.platformAdmin);}
+ @Post('ai/providers/openai') saveOpenAiKey(@Req() req:{platformAdmin:PlatformAdmin},@Body() body:unknown){return this.service.saveAiProviderKey(req.platformAdmin,body);}
+ @Post('ai/providers/:provider/test') testAiProvider(@Req() req:{platformAdmin:PlatformAdmin},@Param('provider') provider:string){return this.service.testAiProvider(req.platformAdmin,provider);}
  @Get('integrations/mpesa') mpesaStatus(@Req() req:{platformAdmin:PlatformAdmin}){return this.service.mpesaStatus(req.platformAdmin);}
  @Post('integrations/mpesa') saveMpesa(@Req() req:{platformAdmin:PlatformAdmin},@Body() body:unknown){return this.service.saveMpesa(req.platformAdmin,body);}
  @Get('companies/:id/channels') companyChannels(@Req() req:{platformAdmin:PlatformAdmin},@Param('id') id:string){return this.service.listCompanyChannels(req.platformAdmin,id);}
