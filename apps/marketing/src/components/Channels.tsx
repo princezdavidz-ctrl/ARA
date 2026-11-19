@@ -1,29 +1,35 @@
-import { MessageCircle, Mail, Instagram, Music2 } from 'lucide-react';
-
 const channels = [
   {
     name: 'WhatsApp',
     desc: 'Cloud API replies with delivery tracking and customer-service window handling.',
-    icon: MessageCircle,
+    iconSrc: 'https://img.icons8.com/color/48/whatsapp--v1.png',
+    iconAlt: 'WhatsApp logo',
+    iconCredit: 'https://icons8.com/icon/16713/whatsapp',
     tint: 'from-emerald-400 to-green-600',
     badge: 'Most popular',
   },
   {
     name: 'Email',
     desc: 'Signed inbound relay plus Resend outbound. Every reply grounded in your knowledge base.',
-    icon: Mail,
+    iconSrc: 'https://img.icons8.com/color/48/email.png',
+    iconAlt: 'Email logo',
+    iconCredit: 'https://icons8.com/icon/13826/email',
     tint: 'from-sky-400 to-blue-600',
   },
   {
     name: 'Instagram',
     desc: 'Direct messages through the Meta Messaging API, with attachments escalated to humans.',
-    icon: Instagram,
+    iconSrc: 'https://img.icons8.com/color/48/instagram-new--v1.png',
+    iconAlt: 'Instagram logo',
+    iconCredit: 'https://icons8.com/icon/32323/instagram',
     tint: 'from-fuchsia-400 to-pink-600',
   },
   {
     name: 'TikTok',
     desc: 'Business messaging with normalized webhooks and per-tenant encrypted credentials.',
-    icon: Music2,
+    iconSrc: 'https://img.icons8.com/color/48/tiktok--v1.png',
+    iconAlt: 'TikTok logo',
+    iconCredit: 'https://icons8.com/icon/118640/tiktok',
     tint: 'from-rose-400 to-red-600',
   },
 ];
@@ -51,10 +57,16 @@ export default function Channels() {
               key={c.name}
               className="card-glow group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition-all duration-300 hover:-translate-y-1 hover:bg-white/[0.06]"
             >
-              <div
-                className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${c.tint} shadow-lg`}
-              >
-                <c.icon className="h-6 w-6 text-white" />
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white p-2.5 shadow-lg shadow-black/20">
+                <img
+                  src={c.iconSrc}
+                  alt={c.iconAlt}
+                  width={40}
+                  height={40}
+                  loading="lazy"
+                  decoding="async"
+                  className="h-9 w-9 object-contain"
+                />
               </div>
               {c.badge && (
                 <span className="absolute right-4 top-4 rounded-full bg-brand-500/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-brand-300">
@@ -66,6 +78,22 @@ export default function Channels() {
             </div>
           ))}
         </div>
+
+        <p className="mt-6 text-center text-xs text-ink-500">
+          Channel icons by{' '}
+          <a href="https://icons8.com/icons/set/social-media--icons8" target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-ink-300">
+            Icons8
+          </a>
+          {' · '}
+          {channels.map((channel, index) => (
+            <span key={channel.name}>
+              {index > 0 && ' · '}
+              <a href={channel.iconCredit} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-ink-300">
+                {channel.name}
+              </a>
+            </span>
+          ))}
+        </p>
       </div>
     </section>
   );
