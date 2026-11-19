@@ -7,7 +7,7 @@ describe('PlatformService AI reply approvals',()=>{
   const setup=()=>{
     const client:any={query:jest.fn().mockResolvedValue({rows:[pending],rowCount:1})};
     const db:any={query:jest.fn().mockResolvedValue({rows:[]}),transaction:jest.fn(async(fn:any)=>fn(client))};
-    const service=new PlatformService(db,{} as any,{} as any,{} as any);
+    const service=new PlatformService(db,{} as any,{} as any,{} as any,{} as any,{} as any,{} as any);
     return {service,db,client};
   };
   it('lists only pending AI drafts belonging to the authenticated tenant',async()=>{
