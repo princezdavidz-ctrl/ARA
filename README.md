@@ -5,7 +5,7 @@ NestJS + TypeScript backend for ARA, a multi-company AI communication platform. 
 ## Setup
 1. Copy .env.example to .env; set OpenAI key, 32+ character ingestion key and JWT secret.
 2. Start PostgreSQL with docker compose up -d db.
-3. Apply SQL migrations 001_init.sql through 020_supervised_message_approval.sql in numeric order. Migrations 011–015 add the multi-company platform foundation, webhook verification tracking, per-conversation channel-connection ownership, industry-neutral knowledge bases/categories, and invoice/payment-event accounting.
+3. Apply SQL migrations 001_init.sql through 023_supervised_message_approval.sql in numeric order. Migrations 011–015 add the multi-company platform foundation, webhook verification tracking, per-conversation channel-connection ownership, industry-neutral knowledge bases/categories, and invoice/payment-event accounting.
 4. Run npm ci, npm run build, npm test, then npm run start:dev.
 
 For local development, `./run-backend.sh` creates `.env` from `.env.example` if needed, starts PostgreSQL, checks for the required database tables, installs dependencies when `node_modules` is missing, and starts the backend plus both local frontends. Fill in the required `.env` values and apply the database migrations before running it. On a database with no platform administrator or matching company owner, the script prompts for account details and passwords without echoing or saving the passwords. The Super Admin password must be at least 16 characters; the company owner password must be at least 12 characters. The script does not apply migrations to an existing database. Open the local URLs printed by the script; the frontends use the local backend automatically on localhost.
