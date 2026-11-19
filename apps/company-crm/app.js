@@ -159,8 +159,8 @@ async function inbox(){
 }
 async function handoff(){
   pageTitle('Human handoff','Review customer requests that need a person');
-  var result=await Promise.all([api('/platform/escalations'),api('/platform/conversations')]);
-  var items=result[0]||[],conversations=result[1]||[];
+  var result=await Promise.all([api('/platform/escalations'),api('/platform/conversations'),api('/platform/team/presence')]);
+  var items=result[0]||[],conversations=result[1]||[],presence=result[2]||[],onlineStaff=presence.filter(function(member){return member.isOnline;});
   function conversationFor(item){return conversations.find(function(c){return c.id===(item.conversation_id||item.conversationId);})||{};}
   var rows=items.map(function(item){
     var conversation=conversationFor(item),name=conversation.customer_name||conversation.customerName||conversation.customer_contact||conversation.customerContact||'Customer';
@@ -170,8 +170,10 @@ async function handoff(){
     if(status==='open'||status==='claimed')actions+=' <button class="danger" data-handoff-resolve="'+esc(id)+'">Resolve</button>';
     return '<tr><td><strong>'+esc(name)+'</strong><small class="subtle">'+esc(conversation.channel||'')+'</small></td><td>'+esc(item.reason||'Staff review requested')+'</td><td><span class="pill '+(status==='resolved'?'success':'warning')+'">'+esc(status)+'</span></td><td>'+esc(fmtDate(item.created_at||item.createdAt))+'</td><td><div class="actions">'+actions+'</div></td></tr>';
   });
-  document.getElementById('content').innerHTML='<div class="notice">Requests in this queue are scoped to your company. Claim a request to take ownership, open its conversation to reply, and resolve it when the customer has been helped.</div><div class="section-head"><h2>Requests needing a person</h2><button class="secondary" id="refresh-handoff">Refresh</button></div>'+table(['Customer','Reason','Status','Received','Actions'],rows);
+  var onlineNames=onlineStaff.map(function(member){return esc(member.fullName);}).join(', ');
+  document.getElementById('content').innerHTML='<div class="notice">Requests in this queue are scoped to your company. Claim a request to take ownership; the conversation will be assigned to you automatically. Open it to reply, then resolve the request when the customer has been helped.</div><div class="panel" style="padding:16px;margin-bottom:18px"><strong>'+onlineStaff.length+' team member(s) online</strong><p class="subtle">'+(onlineNames||'No team members are currently marked online')+'</p><button class="secondary" id="manage-presence">Manage team availability</button></div><div class="section-head"><h2>Requests needing a person</h2><button class="secondary" id="refresh-handoff">Refresh</button></div>'+table(['Customer','Reason','Status','Received','Actions'],rows);
   document.getElementById('refresh-handoff').onclick=function(){handoff();};
+  document.getElementById('manage-presence').onclick=function(){page='team';loadPage();};
   document.querySelectorAll('[data-handoff-claim]').forEach(function(button){button.onclick=async function(){button.disabled=true;try{await api('/platform/escalations/'+encodeURIComponent(button.dataset.handoffClaim)+'/claim',{method:'POST',body:'{}'});await handoff();}catch(error){alert(error.message);button.disabled=false;}};});
   document.querySelectorAll('[data-handoff-resolve]').forEach(function(button){button.onclick=async function(){if(!confirm('Resolve this human handoff request?'))return;button.disabled=true;try{await api('/platform/escalations/'+encodeURIComponent(button.dataset.handoffResolve)+'/resolve',{method:'POST',body:'{}'});await handoff();}catch(error){alert(error.message);button.disabled=false;}};});
   document.querySelectorAll('[data-handoff-open]').forEach(function(button){button.onclick=function(){var id=button.dataset.handoffOpen;if(!id)return;selectedConversation=id;page='inbox';loadPage();};});
