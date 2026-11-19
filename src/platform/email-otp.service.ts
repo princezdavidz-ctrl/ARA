@@ -4,7 +4,7 @@ import nodemailer from 'nodemailer';
 import { DatabaseService } from '../database/database.service';
 import { ConfigService } from '../config/config.service';
 
-export type OtpPurpose = 'company_auth' | 'admin_auth';
+export type OtpPurpose = 'company_auth' | 'admin_auth' | 'company_password_reset';
 
 @Injectable()
 export class EmailOtpService {
@@ -51,9 +51,10 @@ export class EmailOtpService {
     let transporter: any;
     try {
       if (!testOtpEnabled) {
-      const subject = 'Your ARA verification code';
-      const messageText = 'Your ARA verification code is ' + code + '. It expires in 5 minutes. If you did not request this code, you can ignore this email.';
-      const messageHtml = '<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:32px;color:#172033"><h2>Verify your ARA sign-in</h2><p>Enter this one-time code to continue:</p><div style="font-size:32px;font-weight:700;letter-spacing:8px;padding:18px;background:#f2f5fa;border-radius:12px;text-align:center">' + code + '</div><p>This code expires in 5 minutes and can only be used once.</p><p>If you did not request this code, ignore this email.</p></div>';
+      const isPasswordReset = purpose === 'company_password_reset';
+      const subject = isPasswordReset ? 'Reset your ARA company CRM password' : 'Your ARA verification code';
+      const messageText = isPasswordReset ? 'Your ARA password reset code is ' + code + '. It expires in 5 minutes and can only be used once. If you did not request this reset, you can ignore this email.' : 'Your ARA verification code is ' + code + '. It expires in 5 minutes. If you did not request this code, you can ignore this email.';
+      const messageHtml = '<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:32px;color:#172033"><h2>' + (isPasswordReset ? 'Reset your ARA password' : 'Verify your ARA sign-in') + '</h2><p>' + (isPasswordReset ? 'Use this one-time code to choose a new password:' : 'Enter this one-time code to continue:') + '</p><div style="font-size:32px;font-weight:700;letter-spacing:8px;padding:18px;background:#f2f5fa;border-radius:12px;text-align:center">' + code + '</div><p>This code expires in 5 minutes and can only be used once.</p><p>If you did not request this, ignore this email.</p></div>';
       if (resendApiKey) {
         const response = await fetch('https://api.resend.com/emails', {
           method: 'POST',

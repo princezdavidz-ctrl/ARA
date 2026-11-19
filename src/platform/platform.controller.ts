@@ -7,6 +7,8 @@ export class PlatformController {
   @Post('register') register(@Body() body:unknown){return this.platform.register(body);}
   @UseGuards(AuthGuard) @Get('brand-profile') brandProfile(@Req() req:{user:AraUser}){return this.platform.brandProfile(req.user);}
   @UseGuards(AuthGuard) @Post('brand-profile') updateBrandProfile(@Req() req:{user:AraUser},@Body() body:unknown){return this.platform.updateBrandProfile(req.user,body);}
+  @Post('forgot-password') forgotPassword(@Body() body:unknown){return this.platform.requestCompanyPasswordReset(body);}
+  @Post('reset-password') resetPassword(@Body() body:unknown){return this.platform.resetCompanyPassword(body);}
   @Post('login') login(@Body() body:unknown){return this.platform.login(body);}
   @Post('verify-otp') verifyOtp(@Body() body:unknown){return this.platform.verifyLoginOtp(body);}
   @Post('resend-otp') resendOtp(@Body() body:any){return this.platform.resendLoginOtp(body);}
