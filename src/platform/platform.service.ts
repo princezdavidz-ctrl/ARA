@@ -108,7 +108,7 @@ export class PlatformService implements OnApplicationBootstrap {
     const slug=String(body?.agencySlug||'').trim().toLowerCase();
     const password=String(body?.newPassword||'');
     if(!configured||!supplied||supplied.length!==configured.length||!timingSafeEqual(Buffer.from(supplied),Buffer.from(configured))) throw new UnauthorizedException('Invalid or unavailable reset authorization');
-    if(!/^\\S+@\\S+\.\\S+$/.test(email)||!slug||password.length<12||password.length>256) throw new BadRequestException('Provide the agency slug, valid owner email and a password of 12–256 characters.');
+    if(!/^\S+@\S+\.\S+$/.test(email)||!slug||password.length<12||password.length>256) throw new BadRequestException('Provide the agency slug, valid owner email and a password of 12–256 characters.');
     const passwordHash=await this.hashPassword(password);
     return this.db.transaction(async c=>{
       const gate=await c.query('SELECT consumed_at FROM owner_password_reset_state WHERE id=1 FOR UPDATE');
@@ -140,7 +140,7 @@ export class PlatformService implements OnApplicationBootstrap {
 
   async requestCompanyPasswordReset(body:any){
     const email=String(body?.email||'').trim().toLowerCase();
-    if(!/^\\S+@\\S+\\.\\S+$/.test(email))throw new BadRequestException('Enter a valid account email address.');
+    if(!/^\S+@\S+\.\S+$/.test(email))throw new BadRequestException('Enter a valid account email address.');
     const found=await this.db.query("SELECT u.id FROM agency_users u JOIN agencies a ON a.id=u.agency_id WHERE lower(u.email)=$1 AND u.is_active=true AND a.is_active=true ORDER BY u.created_at ASC NULLS LAST LIMIT 1",[email]);
     if(!found.rowCount){
       return {requiresOtp:true,challengeId:randomUUID(),email,expiresIn:300,resendAfter:60,message:process.env.ARA_ENVIRONMENT==='staging'&&process.env.ARA_TEST_OTP_ENABLED==='true'?'Staging test code is 127457. This code is not available in production.':'If an active ARA account exists for this email, a reset code has been sent.'};
@@ -229,7 +229,7 @@ export class PlatformService implements OnApplicationBootstrap {
   async addMember(u:User,b:any){
     this.requireRole(u,['owner','admin']);
     const email=String(b?.email||'').trim().toLowerCase(),fullName=String(b?.fullName||'').trim(),password=String(b?.password||''),role=String(b?.role||'agent');
-    if(!/^\\S+@\\S+\.\\S+$/.test(email)||fullName.length<2||password.length<12||!['admin','manager','agent'].includes(role))throw new BadRequestException('Invalid member details or role. Password minimum is 12 characters.');
+    if(!/^\S+@\S+\.\S+$/.test(email)||fullName.length<2||password.length<12||!['admin','manager','agent'].includes(role))throw new BadRequestException('Invalid member details or role. Password minimum is 12 characters.');
     const hash=await this.hashPassword(password);
     try{
       return await this.db.transaction(async client=>{
