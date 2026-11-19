@@ -84,7 +84,7 @@ export class AnswerService {
 
     if(!enabled)return{
       answer:lang==='sw'?'Msaidizi wa AI wa kampuni hii amezimwa. Ombi lako limepelekwa kwa mfanyakazi.':'The company AI assistant is disabled. This request has been sent for staff review.',
-      language:lang,status:'needs_human' as const,confidence:'low' as const,citations:[],
+      language:lang,status:'needs_human' as const,responseMode,confidence:'low' as const,citations:[],
       escalationReason:'Company AI assistant is disabled.'
     };
 
@@ -92,7 +92,7 @@ export class AnswerService {
     const reservation=await this.quota.reserve(agencyId,quotaKey);
     if(!reservation.allowed)return{
       answer:lang==='sw'?'Kikomo cha majibu ya AI cha mpango huu kimefikiwa. Ombi lako limepelekwa kwa mfanyakazi.':'This subscription has reached its AI response allowance. Your request has been sent for staff review.',
-      language:lang,status:'needs_human' as const,confidence:'low' as const,citations:[],
+      language:lang,status:'needs_human' as const,responseMode,confidence:'low' as const,citations:[],
       escalationReason:reservation.reason||'AI subscription usage limit reached.'
     };
     let hits:Chunk[];
@@ -106,7 +106,7 @@ export class AnswerService {
       await this.quota.release(agencyId,quotaKey);
       return{
         answer:lang==='sw'?'Sina taarifa zilizothibitishwa za kutosha kujibu. Ombi hili linahitaji ukaguzi wa mfanyakazi.':'I do not have enough verified company information to answer accurately. This request needs a staff review.',
-        language:lang,status:'needs_human',confidence:'low',citations:[],escalationReason:'No sufficiently relevant evidence retrieved.'
+        language:lang,status:'needs_human',responseMode,confidence:'low',citations:[],escalationReason:'No sufficiently relevant evidence retrieved.'
       };
     }
     const evidence=hits.map(h=>({documentId:h.documentId,title:h.title,category:h.category,language:h.language,metadata:h.metadata,text:h.content}));
@@ -134,18 +134,18 @@ Reply in the customer's requested language. If preferredLanguage is auto, use ${
       const confidenceScore=data.confidence==='high'?0.9:data.confidence==='medium'?0.72:0.3;
       if(responseMode==='draft_only'||(data.status==='answered'&&confidenceScore<threshold)){
         await this.quota.release(agencyId,quotaKey);
-        return {...data,status:'needs_human' as const,escalationReason:responseMode==='draft_only'?'Company response mode requires human approval.':'AI confidence is below the company threshold.'};
+        return {...data,status:'needs_human' as const,responseMode,escalationReason:responseMode==='draft_only'?'Company response mode requires human approval.':'AI confidence is below the company threshold.'};
       }
       if(data.status==='answered')await this.quota.consume(agencyId,quotaKey);
       else await this.quota.release(agencyId,quotaKey);
-      return data;
+      return {...data,responseMode};
     }catch{
       try{await this.quota.release(agencyId,quotaKey);}catch(error){
         this.logger.warn('AI quota reservation release failed: '+(error instanceof Error?error.name:'UnknownError'));
       }
       return{
         answer:lang==='sw'?'Siwezi kuthibitisha jibu sahihi kutokana na rekodi zilizopo. Ombi hili linahitaji ukaguzi wa mfanyakazi.':'I cannot verify an accurate answer from the available company records. This request needs a staff review.',
-        language:lang,status:'needs_human',confidence:'low',citations:[],escalationReason:'AI output failed validation or grounding.'
+        language:lang,status:'needs_human',responseMode,confidence:'low',citations:[],escalationReason:'AI output failed validation or grounding.'
       };
     }
   }
