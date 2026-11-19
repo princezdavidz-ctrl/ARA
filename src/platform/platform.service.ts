@@ -118,8 +118,8 @@ export class PlatformService implements OnApplicationBootstrap {
   }
   async login(body:any){
     const email=String(body?.email||'').trim().toLowerCase(),password=String(body?.password||''),agencyId=String(body?.agencyId||'').trim();
-    if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)||!password)throw new UnauthorizedException('Invalid email or password');
-    const r=await this.db.query('SELECT u.id,u.agency_id AS "agencyId",u.email,u.password_hash,a.name AS "companyName" FROM agency_users u JOIN agencies a ON a.id=u.agency_id WHERE lower(u.email)=$1 AND u.is_active=true AND a.is_active=true ORDER BY a.name LIMIT 50',[email]);
+    if(!email.includes('@')||!email.includes('.')||!password)throw new UnauthorizedException('Invalid email or password');
+    const r=await this.db.query('SELECT u.id,u.agency_id AS "agencyId",u.email,u.password_hash,a.name AS "companyName" FROM agency_users u JOIN agencies a ON a.id=u.agency_id WHERE lower(u.email)=$1 AND u.is_active=true AND a.is_active=true ORDER BY a.name',[email]);
     const matches:any[]=[];
     for(const candidate of r.rows){if(await this.verifyPassword(password,candidate.password_hash))matches.push(candidate);}
     if(!matches.length)throw new UnauthorizedException('Invalid email or password');
