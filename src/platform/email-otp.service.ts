@@ -18,14 +18,15 @@ export class EmailOtpService {
     const email = String(emailValue || '').trim().toLowerCase();
     if (!/^\S+@\S+\.\S+$/.test(email)) throw new UnauthorizedException('A valid account email is required');
 
+    const resendApiKey = this.config.get('RESEND_API_KEY');
     const smtpHost = this.config.get('SMTP_HOST');
     const smtpPort = this.config.get('SMTP_PORT');
     const smtpSecure = this.config.get('SMTP_SECURE');
     const smtpUser = this.config.get('SMTP_USER');
     const smtpPass = this.config.get('SMTP_PASS');
     const from = this.config.get('ARA_AUTH_EMAIL_FROM') || smtpUser;
-    if (!smtpHost || !smtpPort || !smtpUser || !smtpPass || !from) {
-      throw new ServiceUnavailableException('Gmail SMTP is not configured. Contact the platform administrator.');
+    if (resendApiKey ? !from : (!smtpHost || !smtpPort || !smtpUser || !smtpPass || !from)) {
+      throw new ServiceUnavailableException('Configure Resend HTTPS email (RESEND_API_KEY and ARA_AUTH_EMAIL_FROM) or a supported SMTP provider.');
     }
 
     const recent = await this.db.query(
@@ -47,23 +48,36 @@ export class EmailOtpService {
 
     let transporter: any;
     try {
-      transporter = nodemailer.createTransport({
-        host: smtpHost,
-        port: smtpPort,
-        secure: smtpSecure,
-        requireTLS: !smtpSecure,
-        auth: { user: smtpUser, pass: smtpPass },
-        connectionTimeout: 15000,
-        greetingTimeout: 15000,
-        socketTimeout: 20000,
-      });
-      await transporter.sendMail({
-        from: { name: 'ARA', address: from },
-        to: email,
-        subject: 'Your ARA verification code',
-        text: 'Your ARA verification code is ' + code + '. It expires in 5 minutes. If you did not request this code, you can ignore this email.',
-        html: '<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:32px;color:#172033"><h2>Verify your ARA sign-in</h2><p>Enter this one-time code to continue:</p><div style="font-size:32px;font-weight:700;letter-spacing:8px;padding:18px;background:#f2f5fa;border-radius:12px;text-align:center">' + code + '</div><p>This code expires in 5 minutes and can only be used once.</p><p>If you did not request this code, ignore this email.</p></div>',
-      });
+      const subject = 'Your ARA verification code';
+      const messageText = 'Your ARA verification code is ' + code + '. It expires in 5 minutes. If you did not request this code, you can ignore this email.';
+      const messageHtml = '<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:32px;color:#172033"><h2>Verify your ARA sign-in</h2><p>Enter this one-time code to continue:</p><div style="font-size:32px;font-weight:700;letter-spacing:8px;padding:18px;background:#f2f5fa;border-radius:12px;text-align:center">' + code + '</div><p>This code expires in 5 minutes and can only be used once.</p><p>If you did not request this code, ignore this email.</p></div>';
+      if (resendApiKey) {
+        const response = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + resendApiKey, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ from: 'ARA <' + from + '>', to: [email], subject, text: messageText, html: messageHtml }),
+        });
+        if (!response.ok) {
+          const detail = await response.text().catch(() => '');
+          const error: any = new Error('Resend email API returned HTTP ' + response.status);
+          error.code = 'ERESEND';
+          error.responseCode = response.status;
+          error.response = detail.slice(0, 240);
+          throw error;
+        }
+      } else {
+        transporter = nodemailer.createTransport({
+          host: smtpHost,
+          port: smtpPort,
+          secure: smtpSecure,
+          requireTLS: !smtpSecure,
+          auth: { user: smtpUser, pass: smtpPass },
+          connectionTimeout: 15000,
+          greetingTimeout: 15000,
+          socketTimeout: 20000,
+        });
+        await transporter.sendMail({ from: { name: 'ARA', address: from }, to: email, subject, text: messageText, html: messageHtml });
+      }
     } catch (error: any) {
       await this.db.query('UPDATE auth_email_otps SET consumed_at=now() WHERE id=$1', [challengeId]);
       const diagnostic = {
@@ -74,11 +88,13 @@ export class EmailOtpService {
       };
       console.error('[ARA][SMTP] Gmail OTP delivery failed', diagnostic);
       const code = diagnostic.code;
-      const hint = code === 'ETIMEDOUT' || code === 'ECONNECTION' || code === 'ESOCKET'
-        ? 'If ARA is running on a Render Free web service, outbound SMTP ports 25, 465 and 587 are blocked. Use an HTTPS email API or upgrade this backend to a paid Render instance; changing Gmail credentials or TLS settings will not remove this network restriction.'
-        : code === 'EAUTH' || diagnostic.responseCode === 535
-          ? 'Gmail rejected SMTP authentication. Generate a fresh Google App Password and confirm SMTP_USER is the matching Gmail account.'
-          : 'Check the Gmail SMTP sender, app password and authorised sender address.';
+      const hint = code === 'ERESEND'
+        ? 'Resend email delivery failed. Confirm RESEND_API_KEY is valid and ARA_AUTH_EMAIL_FROM uses a sender domain verified in Resend.'
+        : code === 'ETIMEDOUT' || code === 'ECONNECTION' || code === 'ESOCKET'
+          ? 'If ARA is running on a Render Free web service, outbound SMTP ports 25, 465 and 587 are blocked. Configure RESEND_API_KEY and a verified ARA_AUTH_EMAIL_FROM sender, or upgrade this backend to a paid Render instance.'
+          : code === 'EAUTH' || diagnostic.responseCode === 535
+            ? 'Gmail rejected SMTP authentication. Generate a fresh Google App Password and confirm SMTP_USER is the matching Gmail account.'
+            : 'Check the configured email provider, API key or authorised sender address.';
       throw new ServiceUnavailableException('We could not send the verification email. ' + hint);
     } finally {
       transporter?.close();

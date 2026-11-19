@@ -21,5 +21,7 @@ import { AiUsageController } from './ai-usage.controller';
 import { AiUsageService } from './ai-usage.service';
 import { SubscriptionLimitsService } from './subscription-limits.service';
 import { EmailOtpService } from './email-otp.service';
-@Module({ controllers: [PlatformController, LeadController, PlatformAdminController, ChannelConnectionsController, BillingController, AdminIntegrationsController, AiUsageController], providers: [PlatformService, LeadService, PlatformAdminService, ChannelConnectionsService, ChannelCredentialVault, BillingService, MpesaService, AdminIntegrationsService, AiUsageService, SubscriptionLimitsService, EmailOtpService, AuthGuard, PlatformAdminGuard, ConfigService, DatabaseService], exports: [AuthGuard, ChannelCredentialVault, BillingService] })
+import { SupportService } from './support.service';
+import { PublicSupportController } from '../http/public-support.controller';
+@Module({ controllers: [PlatformController, LeadController, PlatformAdminController, ChannelConnectionsController, BillingController, AdminIntegrationsController, AiUsageController, PublicSupportController], providers: [PlatformService, LeadService, PlatformAdminService, ChannelConnectionsService, ChannelCredentialVault, BillingService, MpesaService, AdminIntegrationsService, AiUsageService, SubscriptionLimitsService, EmailOtpService, SupportService, AuthGuard, PlatformAdminGuard, ConfigService, DatabaseService], exports: [AuthGuard, ChannelCredentialVault, BillingService] })
 export class PlatformModule {}

@@ -16,6 +16,7 @@ async function bootstrap() {
     'https://ara-dashboard-one.vercel.app',
     'https://ara-dashboard-princezdavidz-6985.vercel.app',
     'https://ara-public-website.onrender.com',
+    'https://ara-staff-console.onrender.com',
     ...(process.env.DASHBOARD_ORIGIN || '').split(',').map((origin) => origin.trim()).filter(Boolean),
     ...(process.env.ARA_CRM_ORIGIN || '').split(',').map((origin) => origin.trim()).filter(Boolean),
     ...(process.env.ARA_ADMIN_ORIGIN || '').split(',').map((origin) => origin.trim()).filter(Boolean),
@@ -26,7 +27,7 @@ async function bootstrap() {
       return callback(new Error('Origin not allowed by CORS'));
     },
     methods: ['GET', 'HEAD', 'POST', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Support-Token'],
     credentials: false,
   });
   app.enableShutdownHooks();

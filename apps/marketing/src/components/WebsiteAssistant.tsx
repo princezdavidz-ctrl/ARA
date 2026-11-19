@@ -1,43 +1,45 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import { MessageCircle, Send, Sparkles, X } from 'lucide-react';
+import { MessageCircle, Send, Sparkles, X, Headset } from 'lucide-react';
 
 type ChatMessage = { role: 'assistant' | 'user'; text: string };
 type Language = 'en' | 'sw';
+type SupportMessage = { id:string; senderType:string; body:string; createdAt:string };
+type SupportSession = { id:string; visitorToken:string; status:string };
 const API_BASE = (import.meta.env.VITE_ARA_API_URL || 'https://ara-api-c525.onrender.com').replace(/\/$/, '');
 const copy = {
-  en: { subtitle: 'Website guide · English', greeting: 'Hi! I’m the ARA Website Assistant. Ask me about the platform, supported channels, company workspaces or getting started.', placeholder: 'Ask about ARA…', note: "Please don't share passwords, API keys or private customer information.", thinking: 'Thinking…' },
-  sw: { subtitle: 'Mwongozo wa tovuti · Kiswahili', greeting: 'Habari! Mimi ni Msaidizi wa Tovuti wa ARA. Niulize kuhusu mfumo, njia za mawasiliano, akaunti za kampuni au jinsi ya kuanza.', placeholder: 'Uliza kuhusu ARA…', note: 'Usishiriki nywila, funguo za API au taarifa binafsi za wateja.', thinking: 'Ninafikiria…' },
+  en: { subtitle:'Website guide · English', greeting:'Hi! I’m the ARA Website Assistant. Ask me about the platform, supported channels, company workspaces or getting started.', placeholder:'Ask about ARA…', note:"Please don't share passwords, API keys or private customer information.", thinking:'Thinking…', human:'Talk to a human', name:'Your name', email:'Email address', issue:'How can our team help?', start:'Connect me to support', waiting:'Your request is in the support queue. A team member will join as soon as one is available.', online:'A support teammate is online. Please wait while they join.', offline:'No team member is online right now. Leave your message and we’ll respond when someone is available.', reply:'Message our team…', send:'Send', closed:'This support conversation has been closed.' },
+  sw: { subtitle:'Mwongozo wa tovuti · Kiswahili', greeting:'Habari! Mimi ni Msaidizi wa Tovuti wa ARA. Niulize kuhusu mfumo, njia za mawasiliano, akaunti za kampuni au jinsi ya kuanza.', placeholder:'Uliza kuhusu ARA…', note:'Usishiriki nywila, funguo za API au taarifa binafsi za wateja.', thinking:'Ninafikiria…', human:'Zungumza na mfanyakazi', name:'Jina lako', email:'Barua pepe', issue:'Tunaweza kukusaidiaje?', start:'Unganisha na huduma kwa wateja', waiting:'Ombi lako liko kwenye foleni. Mfanyakazi atajiunga akipatikana.', online:'Mfanyakazi yuko mtandaoni. Tafadhali subiri ajiunge.', offline:'Hakuna mfanyakazi mtandaoni kwa sasa. Acha ujumbe nasi tutajibu mtu akipatikana.', reply:'Andika ujumbe…', send:'Tuma', closed:'Mazungumzo haya ya huduma yamefungwa.' },
 };
-
 export default function WebsiteAssistant() {
-  const [open, setOpen] = useState(false);
-  const [language, setLanguage] = useState<Language | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [draft, setDraft] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const endRef = useRef<HTMLDivElement>(null);
-  const text = language ? copy[language] : copy.en;
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, busy, open]);
-  function chooseLanguage(next: Language) { setLanguage(next); setMessages([{ role: 'assistant', text: copy[next].greeting }]); }
-  async function send(event: FormEvent) {
-    event.preventDefault(); const message = draft.trim(); if (!message || busy || !language) return;
-    setDraft(''); setMessages((items) => [...items, { role: 'user', text: message }]); setBusy(true);
-    try {
-      const response = await fetch(`${API_BASE}/public/assistant`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, language }) });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.message || 'The assistant could not respond just now.');
-      setMessages((items) => [...items, { role: 'assistant', text: data.answer || 'I could not prepare an answer. Please try again.' }]);
-    } catch (error) { setMessages((items) => [...items, { role: 'assistant', text: error instanceof Error ? error.message : 'The assistant is temporarily unavailable.' }]); }
-    finally { setBusy(false); }
-  }
+  const [open,setOpen]=useState(false),[language,setLanguage]=useState<Language|null>(null),[busy,setBusy]=useState(false),[draft,setDraft]=useState(''),[messages,setMessages]=useState<ChatMessage[]>([]);
+  const [handoff,setHandoff]=useState(false),[support,setSupport]=useState<SupportSession|null>(null),[supportMessages,setSupportMessages]=useState<SupportMessage[]>([]),[supportDraft,setSupportDraft]=useState(''),[supportBusy,setSupportBusy]=useState(false),[supportStatus,setSupportStatus]=useState('');
+  const endRef=useRef<HTMLDivElement>(null),supportEndRef=useRef<HTMLDivElement>(null);
+  const text=language?copy[language]:copy.en;
+  useEffect(()=>{endRef.current?.scrollIntoView({behavior:'smooth'});},[messages,busy,open]);
+  useEffect(()=>{supportEndRef.current?.scrollIntoView({behavior:'smooth'});},[supportMessages,supportStatus]);
+  useEffect(()=>{
+    if(!support)return;
+    let active=true;
+    const poll=async()=>{try{const response=await fetch(`${API_BASE}/public/support/requests/${support.id}/messages`,{headers:{'X-Support-Token':support.visitorToken}});if(!response.ok)return;const data=await response.json();if(active){setSupportMessages(data.messages||[]);setSupport(s=>s?{...s,status:data.status}:s);if(data.status==='resolved')setSupportStatus(text.closed);}}catch{}};
+    poll();const timer=window.setInterval(poll,4000);return()=>{active=false;window.clearInterval(timer);};
+  },[support?.id,support?.visitorToken]);
+  function chooseLanguage(next:Language){setLanguage(next);setMessages([{role:'assistant',text:copy[next].greeting}]);}
+  async function send(event:FormEvent){event.preventDefault();const message=draft.trim();if(!message||busy||!language)return;setDraft('');setMessages(items=>[...items,{role:'user',text:message}]);setBusy(true);try{const response=await fetch(`${API_BASE}/public/assistant`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message,language})});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.message||'The assistant could not respond just now.');setMessages(items=>[...items,{role:'assistant',text:data.answer||'I could not prepare an answer. Please try again.'}]);}catch(error){setMessages(items=>[...items,{role:'assistant',text:error instanceof Error?error.message:'The assistant is temporarily unavailable.'}]);}finally{setBusy(false);}}
+  async function startSupport(event:FormEvent){event.preventDefault();if(!language||supportBusy)return;const form=event.currentTarget as HTMLFormElement;const data=new FormData(form);setSupportBusy(true);try{const response=await fetch(`${API_BASE}/public/support/requests`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:data.get('name'),email:data.get('email'),message:data.get('message'),language})});const result=await response.json();if(!response.ok)throw new Error(result.message||'Could not create support request.');setSupport({id:result.id,visitorToken:result.visitorToken,status:result.status});setHandoff(false);setSupportStatus(result.staffOnline?text.online:text.offline);}catch(error){setSupportStatus(error instanceof Error?error.message:'Support is temporarily unavailable.');}finally{setSupportBusy(false);}}
+  async function sendSupport(event:FormEvent){event.preventDefault();if(!support||!supportDraft.trim()||supportBusy||support.status==='resolved')return;setSupportBusy(true);try{const response=await fetch(`${API_BASE}/public/support/requests/${support.id}/messages`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({visitorToken:support.visitorToken,message:supportDraft.trim()})});const data=await response.json();if(!response.ok)throw new Error(data.message||'Message could not be sent.');setSupportDraft('');const refresh=await fetch(`${API_BASE}/public/support/requests/${support.id}/messages`,{headers:{'X-Support-Token':support.visitorToken}});if(refresh.ok){const result=await refresh.json();setSupportMessages(result.messages||[]);}}catch(error){setSupportStatus(error instanceof Error?error.message:'Message could not be sent.');}finally{setSupportBusy(false);}}
   return <div className="website-assistant">
-    {open && <section className="website-assistant-panel" aria-label="ARA website assistant">
-      <header className="website-assistant-header"><span className="website-assistant-avatar"><Sparkles size={18} /></span><span><strong>ARA Assistant</strong><small>{language ? text.subtitle : 'Select a language · Chagua lugha'}</small></span><button type="button" aria-label="Close assistant" onClick={() => setOpen(false)}><X size={18} /></button></header>
-      {!language ? <div className="website-assistant-language"><strong>Choose your language</strong><p>Chagua lugha yako ili kuendelea</p><button type="button" onClick={() => chooseLanguage('en')}>English</button><button type="button" onClick={() => chooseLanguage('sw')}>Kiswahili</button></div> : <>
-        <div className="website-assistant-messages" aria-live="polite">{messages.map((item, index) => <div key={index} className={`website-assistant-message ${item.role}`}>{item.text}</div>)}{busy && <div className="website-assistant-message assistant typing">{text.thinking}</div>}<div ref={endRef} /></div>
-        <form className="website-assistant-form" onSubmit={send}><input value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={1200} placeholder={text.placeholder} aria-label={text.placeholder} /><button type="submit" disabled={busy || draft.trim().length < 2} aria-label="Send message"><Send size={17} /></button></form>
-        <p className="website-assistant-note">{text.note}</p><button type="button" className="website-assistant-change-language" onClick={() => { setLanguage(null); setMessages([]); setDraft(''); }}>Change language · Badili lugha</button>
+    {open&&<section className="website-assistant-panel" aria-label="ARA website assistant">
+      <header className="website-assistant-header"><span className="website-assistant-avatar"><Sparkles size={18}/></span><span><strong>ARA Assistant</strong><small>{language?text.subtitle:'Select a language · Chagua lugha'}</small></span><button type="button" aria-label="Close assistant" onClick={()=>setOpen(false)}><X size={18}/></button></header>
+      {!language?<div className="website-assistant-language"><strong>Choose your language</strong><p>Chagua lugha yako ili kuendelea</p><button type="button" onClick={()=>chooseLanguage('en')}>English</button><button type="button" onClick={()=>chooseLanguage('sw')}>Kiswahili</button></div>:support?<>
+        <div className="website-assistant-support-status">{supportStatus||text.waiting}</div>
+        <div className="website-assistant-messages" aria-live="polite">{supportMessages.map(m=><div key={m.id} className={`website-assistant-message ${m.senderType==='visitor'?'user':'assistant'}`}>{m.body}</div>)}<div ref={supportEndRef}/></div>
+        {support.status!=='resolved'?<form className="website-assistant-form" onSubmit={sendSupport}><input value={supportDraft} onChange={e=>setSupportDraft(e.target.value)} maxLength={12000} placeholder={text.reply}/><button type="submit" disabled={supportBusy||supportDraft.trim().length<1} aria-label={text.send}><Send size={17}/></button></form>:<p className="website-assistant-note">{text.closed}</p>}
+      </>:handoff?<form className="website-assistant-human-form" onSubmit={startSupport}><strong>{text.human}</strong><label>{text.name}<input name="name" minLength={2} maxLength={120} required/></label><label>{text.email}<input name="email" type="email" maxLength={254} required/></label><label>{text.issue}<textarea name="message" rows={3} maxLength={12000} required/></label><button type="submit" disabled={supportBusy}>{supportBusy?'Connecting…':text.start}</button><button type="button" className="website-assistant-change-language" onClick={()=>setHandoff(false)}>← Back to AI assistant</button><p>{supportStatus}</p></form>:<>
+        <div className="website-assistant-messages" aria-live="polite">{messages.map((item,index)=><div key={index} className={`website-assistant-message ${item.role}`}>{item.text}</div>)}{busy&&<div className="website-assistant-message assistant typing">{text.thinking}</div>}<div ref={endRef}/></div>
+        <form className="website-assistant-form" onSubmit={send}><input value={draft} onChange={e=>setDraft(e.target.value)} maxLength={1200} placeholder={text.placeholder} aria-label={text.placeholder}/><button type="submit" disabled={busy||draft.trim().length<2} aria-label="Send message"><Send size={17}/></button></form>
+        <button type="button" className="website-assistant-human-button" onClick={()=>{setHandoff(true);setSupportStatus('');}}><Headset size={15}/>{text.human}</button>
+        <p className="website-assistant-note">{text.note}</p><button type="button" className="website-assistant-change-language" onClick={()=>{setLanguage(null);setMessages([]);setDraft('');setHandoff(false);}}>Change language · Badili lugha</button>
       </>}</section>}
-    <button type="button" className="website-assistant-launcher" onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-label={open ? 'Close ARA assistant' : 'Chat with ARA'}>{open ? <X size={21} /> : <><MessageCircle size={20} /><span>Ask ARA</span></>}</button>
+    <button type="button" className="website-assistant-launcher" onClick={()=>setOpen(v=>!v)} aria-expanded={open} aria-label={open?'Close ARA assistant':'Chat with ARA'}>{open?<X size={21}/>:<><MessageCircle size={20}/><span>Ask ARA</span></>}</button>
   </div>;
 }
