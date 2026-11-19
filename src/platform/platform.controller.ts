@@ -13,6 +13,9 @@ export class PlatformController {
   @Post('owner-password-reset') resetOwnerPassword(@Body() body:unknown){return this.platform.resetOwnerPassword(body);}
   @Post('refresh') refresh(@Body() body:any){return this.platform.refresh(String(body?.refreshToken||''));}
   @Post('logout') logout(@Body() body:any){return this.platform.logout(String(body?.refreshToken||''));}
+  @UseGuards(AuthGuard) @Get('api-keys') apiKeys(@Req() req:{user:AraUser}){return this.platform.listApiKeys(req.user);}
+  @UseGuards(AuthGuard) @Post('api-keys') createApiKey(@Req() req:{user:AraUser},@Body() body:unknown){return this.platform.createApiKey(req.user,body);}
+  @UseGuards(AuthGuard) @Post('api-keys/:id/revoke') revokeApiKey(@Req() req:{user:AraUser},@Param('id') id:string){return this.platform.revokeApiKey(req.user,id);}
   @UseGuards(AuthGuard) @Get('team') team(@Req() req:{user:AraUser}){return this.platform.team(req.user);}
   @UseGuards(AuthGuard) @Get('team/presence') teamPresence(@Req() req:{user:AraUser}){return this.platform.teamPresence(req.user);}
   @UseGuards(AuthGuard) @Post('team/presence') updateTeamPresence(@Req() req:{user:AraUser},@Body() body:unknown){return this.platform.updateTeamPresence(req.user,body);}
