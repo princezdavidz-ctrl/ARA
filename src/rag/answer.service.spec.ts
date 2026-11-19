@@ -123,4 +123,18 @@ describe('AnswerService',()=>{
     });
   });
 
+  it('answers the ARA developer question directly in the selected language without company retrieval',async()=>{
+    const search:any={search:jest.fn()};
+    const ai:any={generateWithUsage:jest.fn()};
+    const db:any={query:jest.fn().mockResolvedValue({rows:[{industry:'general',default_language:'en',enabled:true,response_mode:'supervised'}]})};
+    const config:any={get:jest.fn().mockReturnValue(0.3)};
+    const service=new AnswerService(search,ai,config,db,orchestrator,quota,{generateWithUsage:jest.fn()} as any);
+    const result=await service.answer({message:'Who developed this system?',preferredLanguage:'sw',filters:{}} as any,agencyId);
+    expect(result.answer).toBe('ARA ilitengenezwa na Prince David Wanja.');
+    expect(result.language).toBe('sw');
+    expect(result.status).toBe('answered');
+    expect(search.search).not.toHaveBeenCalled();
+    expect(ai.generateWithUsage).not.toHaveBeenCalled();
+  });
+
 });
