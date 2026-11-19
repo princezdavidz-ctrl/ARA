@@ -36,7 +36,7 @@ const schema = z.object({
   SMTP_PORT: z.preprocess(value => value === '' || value === undefined ? undefined : value, z.coerce.number().int().min(1).max(65535).optional()),
   SMTP_SECURE: z.preprocess(value => value === 'true' || value === true, z.boolean()).default(false),
   SMTP_USER: z.preprocess(value => value === '' ? undefined : value, z.string().email().optional()),
-  SMTP_PASS: z.preprocess(value => value === '' ? undefined : value, z.string().min(16).optional()),
+  SMTP_PASS: z.preprocess(value => value === '' ? undefined : value, z.string().transform(value => value.replace(/\s+/g, '')).pipe(z.string().min(16)).optional()),
   EMAIL_AGENCY_ID: z.preprocess(value => value === '' ? undefined : value, z.string().uuid().optional()),
   EMAIL_RESEND_API_KEY: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).optional()),
   EMAIL_FROM_ADDRESS: z.preprocess(value => value === '' ? undefined : value, z.string().email().optional()),
