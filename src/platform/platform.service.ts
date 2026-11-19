@@ -34,7 +34,7 @@ export class PlatformService implements OnApplicationBootstrap {
     if(name.length<2||name.length>120||fullName.length<2||!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)||password.length<12)throw new BadRequestException('Provide a company name (2–120 characters), full name, valid email and password (minimum 12 characters).');
     if(!/^#[0-9A-F]{6}$/.test(primaryColor)||!/^#[0-9A-F]{6}$/.test(accentColor))throw new BadRequestException('Brand colours must be valid six-digit hex colours.');
     if(logoDataUrl && (logoDataUrl.length>1400000 || !/^data:image\\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(logoDataUrl)))throw new BadRequestException('Company logo must be a PNG, JPEG or WebP image smaller than 1 MB.');
-    if(name.length<2||fullName.length<2||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||password.length<12)throw new BadRequestException('Provide agencyName, fullName, valid email and password (minimum 12 characters).');
+
     const slug=this.slug(name)+'-'+randomBytes(3).toString('hex'),hash=await this.hashPassword(password);
     try{
       const created=await this.db.transaction(async c=>{
