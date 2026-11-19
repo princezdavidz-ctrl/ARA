@@ -36,6 +36,7 @@ export class PlatformService implements OnApplicationBootstrap {
     if(logoDataUrl && (logoDataUrl.length>1400000 || !/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(logoDataUrl)))throw new BadRequestException('Company logo must be a PNG, JPEG or WebP image smaller than 1 MB.');
 
     const slug=this.slug(name)+'-'+randomBytes(3).toString('hex'),hash=await this.hashPassword(password);
+    let createdAgencyId:string|undefined;
     try{
       const created=await this.db.transaction(async c=>{
         const a=await c.query('INSERT INTO agencies(name,slug) VALUES($1,$2) RETURNING id,name,slug',[name,slug]);
@@ -44,12 +45,27 @@ export class PlatformService implements OnApplicationBootstrap {
         await c.query("INSERT INTO knowledge_bases(agency_id,name,industry,is_default) VALUES($1,'Company Knowledge','general',true)",[a.rows[0].id]);
         const u=await c.query('INSERT INTO agency_users(agency_id,email,full_name,password_hash,role) VALUES($1,$2,$3,$4,\'owner\') RETURNING id,agency_id AS "agencyId",email,full_name AS "fullName",role',[a.rows[0].id,email,fullName,hash]);
         const user=u.rows[0];
+        createdAgencyId=a.rows[0].id;
         await c.query('INSERT INTO audit_logs(agency_id,actor_user_id,action,target_type,target_id) VALUES($1,$2,\'agency.registered\',\'agency\',$3)',[user.agencyId,user.id,user.agencyId]);
         return {agency:a.rows[0],user};
       });
       const challenge=await this.otp.issue(email,created.user.id,'company_auth');
       return {...challenge,agency:created.agency,user:created.user};
-    }catch(e:any){if(e.code==='23505')throw new ConflictException('Agency or account already exists.');throw e;}
+    }catch(e:any){
+      if(createdAgencyId && (e instanceof ServiceUnavailableException || e?.status===503)){
+        try{
+          await this.db.transaction(async c=>{
+            await c.query('DELETE FROM auth_email_otps WHERE principal_id IN (SELECT id FROM agency_users WHERE agency_id=$1)',[createdAgencyId]);
+            await c.query('DELETE FROM audit_logs WHERE agency_id=$1',[createdAgencyId]);
+            await c.query('DELETE FROM agencies WHERE id=$1',[createdAgencyId]);
+          });
+        }catch(cleanupError:any){
+          console.error('[ARA] Failed to clean up unverified company registration',String(cleanupError?.code||cleanupError?.message||'unknown').slice(0,160));
+        }
+      }
+      if(e.code==='23505')throw new ConflictException('Agency or account already exists.');
+      throw e;
+    }
   }
 
 
