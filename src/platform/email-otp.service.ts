@@ -45,8 +45,9 @@ export class EmailOtpService {
       [challengeId, email, purpose, principalId, this.digest(challengeId, code)],
     );
 
+    let transporter: any;
     try {
-      const transporter = nodemailer.createTransport({
+      transporter = nodemailer.createTransport({
         host: smtpHost,
         port: smtpPort,
         secure: smtpSecure,
@@ -63,7 +64,6 @@ export class EmailOtpService {
         text: 'Your ARA verification code is ' + code + '. It expires in 5 minutes. If you did not request this code, you can ignore this email.',
         html: '<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:32px;color:#172033"><h2>Verify your ARA sign-in</h2><p>Enter this one-time code to continue:</p><div style="font-size:32px;font-weight:700;letter-spacing:8px;padding:18px;background:#f2f5fa;border-radius:12px;text-align:center">' + code + '</div><p>This code expires in 5 minutes and can only be used once.</p><p>If you did not request this code, ignore this email.</p></div>',
       });
-      transporter.close();
     } catch (error: any) {
       await this.db.query('UPDATE auth_email_otps SET consumed_at=now() WHERE id=$1', [challengeId]);
       const diagnostic = {
@@ -81,7 +81,7 @@ export class EmailOtpService {
           : 'Check the Gmail SMTP sender, app password and authorised sender address.';
       throw new ServiceUnavailableException('We could not send the verification email. ' + hint);
     } finally {
-      transporter.close();
+      transporter?.close();
     }
 
     return { requiresOtp: true, challengeId, email, expiresIn: 300, resendAfter: 60, message: 'A six-digit verification code has been sent to your email.' };
