@@ -31,9 +31,9 @@ export class PlatformService implements OnApplicationBootstrap {
   async register(body:any){
     const name=String(body?.agencyName||'').trim(),fullName=String(body?.fullName||'').trim(),email=String(body?.email||'').trim().toLowerCase(),password=String(body?.password||'');
     const primaryColor=String(body?.primaryColor||'#10B981').toUpperCase(),accentColor=String(body?.accentColor||'#0F172A').toUpperCase(),logoDataUrl=String(body?.logoDataUrl||'');
-    if(name.length<2||name.length>120||fullName.length<2||!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)||password.length<12)throw new BadRequestException('Provide a company name (2–120 characters), full name, valid email and password (minimum 12 characters).');
+    if(name.length<2||name.length>120||fullName.length<2||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||password.length<12)throw new BadRequestException('Provide a company name (2–120 characters), full name, valid email and password (minimum 12 characters).');
     if(!/^#[0-9A-F]{6}$/.test(primaryColor)||!/^#[0-9A-F]{6}$/.test(accentColor))throw new BadRequestException('Brand colours must be valid six-digit hex colours.');
-    if(logoDataUrl && (logoDataUrl.length>1400000 || !/^data:image\\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(logoDataUrl)))throw new BadRequestException('Company logo must be a PNG, JPEG or WebP image smaller than 1 MB.');
+    if(logoDataUrl && (logoDataUrl.length>1400000 || !/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(logoDataUrl)))throw new BadRequestException('Company logo must be a PNG, JPEG or WebP image smaller than 1 MB.');
 
     const slug=this.slug(name)+'-'+randomBytes(3).toString('hex'),hash=await this.hashPassword(password);
     try{
@@ -63,7 +63,7 @@ export class PlatformService implements OnApplicationBootstrap {
     const name=String(b?.companyName||'').trim(),primary=String(b?.primaryColor||'').toUpperCase(),accent=String(b?.accentColor||'').toUpperCase(),logo=String(b?.logoDataUrl||'');
     if(name.length<2||name.length>120)throw new BadRequestException('Company name must be 2–120 characters.');
     if(!/^#[0-9A-F]{6}$/.test(primary)||!/^#[0-9A-F]{6}$/.test(accent))throw new BadRequestException('Brand colours must be valid six-digit hex colours.');
-    if(logo && (logo.length>1400000 || !/^data:image\\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(logo)))throw new BadRequestException('Logo must be a PNG, JPEG or WebP image smaller than 1 MB.');
+    if(logo && (logo.length>1400000 || !/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(logo)))throw new BadRequestException('Logo must be a PNG, JPEG or WebP image smaller than 1 MB.');
     await this.db.transaction(async c=>{
       await c.query('UPDATE agencies SET name=$2 WHERE id=$1',[u.agencyId,name]);
       await c.query('UPDATE company_settings SET display_name=$2,logo_data_url=$3,brand_primary_color=$4,brand_accent_color=$5,updated_at=now() WHERE agency_id=$1',[u.agencyId,name,logo||null,primary,accent]);
@@ -79,7 +79,7 @@ export class PlatformService implements OnApplicationBootstrap {
     const slug=String(body?.agencySlug||'').trim().toLowerCase();
     const password=String(body?.newPassword||'');
     if(!configured||!supplied||supplied.length!==configured.length||!timingSafeEqual(Buffer.from(supplied),Buffer.from(configured))) throw new UnauthorizedException('Invalid or unavailable reset authorization');
-    if(!/^\\S+@\\S+\\.\\S+$/.test(email)||!slug||password.length<12||password.length>256) throw new BadRequestException('Provide the agency slug, valid owner email and a password of 12–256 characters.');
+    if(!/^\\S+@\\S+\.\\S+$/.test(email)||!slug||password.length<12||password.length>256) throw new BadRequestException('Provide the agency slug, valid owner email and a password of 12–256 characters.');
     const passwordHash=await this.hashPassword(password);
     return this.db.transaction(async c=>{
       const gate=await c.query('SELECT consumed_at FROM owner_password_reset_state WHERE id=1 FOR UPDATE');
@@ -119,7 +119,7 @@ export class PlatformService implements OnApplicationBootstrap {
   async addMember(u:User,b:any){
     this.requireRole(u,['owner','admin']);
     const email=String(b?.email||'').trim().toLowerCase(),fullName=String(b?.fullName||'').trim(),password=String(b?.password||''),role=String(b?.role||'agent');
-    if(!/^\\S+@\\S+\\.\\S+$/.test(email)||fullName.length<2||password.length<12||!['admin','manager','agent'].includes(role))throw new BadRequestException('Invalid member details or role. Password minimum is 12 characters.');
+    if(!/^\\S+@\\S+\.\\S+$/.test(email)||fullName.length<2||password.length<12||!['admin','manager','agent'].includes(role))throw new BadRequestException('Invalid member details or role. Password minimum is 12 characters.');
     const hash=await this.hashPassword(password);
     try{
       return await this.db.transaction(async client=>{
