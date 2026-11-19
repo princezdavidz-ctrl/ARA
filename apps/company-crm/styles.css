@@ -354,4 +354,8 @@ button:not(.secondary):not(.danger){background:var(--brand);box-shadow:0 5px 14p
 .login-panel .mobile-brand{display:none}
 @media(max-width:900px){.login-wrap{grid-template-columns:minmax(280px,.8fr) minmax(390px,1fr)}.login-visual{padding:35px}.login-copy h1{font-size:39px}}
 @media(max-width:700px){.login-wrap{grid-template-columns:1fr;min-height:100vh}.login-visual{display:none}.login-panel{min-height:100vh;padding:20px;background:radial-gradient(circle at 90% 0%,rgba(16,184,132,.1),transparent 28%),#f5f7fb}.login-panel .login{padding:28px 23px;border-radius:19px}.login-panel .mobile-brand{display:block;margin-bottom:30px}.login-panel .login h1{margin-top:18px;font-size:26px}}
+.workspace-choice-list{display:grid;gap:10px;margin:22px 0}
+.login-panel .workspace-choice-button{width:100%;padding:15px 16px;border:1px solid #e1e8f0;border-radius:12px;background:#fff;color:#1e293b;text-align:left;font-size:13px;font-weight:700;box-shadow:0 3px 10px rgba(20,38,66,.04)}
+.login-panel .workspace-choice-button:hover:not(:disabled){border-color:#10b981;background:#f3fbf7;transform:translateY(-1px);box-shadow:0 8px 18px rgba(16,159,114,.1)}
+.login-panel .workspace-choice-button:disabled{opacity:.65;cursor:wait}
 @media(prefers-reduced-motion:reduce){.login-spinner{animation:none}}

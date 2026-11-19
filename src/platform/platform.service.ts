@@ -117,11 +117,19 @@ export class PlatformService implements OnApplicationBootstrap {
     });
   }
   async login(body:any){
-    const email=String(body?.email||'').trim().toLowerCase(),password=String(body?.password||''),slug=String(body?.agencySlug||'').trim().toLowerCase();
-    if(!slug)throw new BadRequestException('agencySlug is required to select the correct agency');
-    const r=await this.db.query('SELECT u.id,u.email,u.password_hash FROM agency_users u JOIN agencies a ON a.id=u.agency_id WHERE lower(u.email)=$1 AND a.slug=$2 AND u.is_active=true AND a.is_active=true LIMIT 1',[email,slug]);
-    const row=r.rows[0];if(!row||!(await this.verifyPassword(password,row.password_hash)))throw new UnauthorizedException('Invalid email, password or agency');
-    return this.otp.issue(row.email,row.id,'company_auth');
+    const email=String(body?.email||'').trim().toLowerCase(),password=String(body?.password||''),agencyId=String(body?.agencyId||'').trim();
+    if(!email.includes('@')||!email.includes('.')||!password)throw new UnauthorizedException('Invalid email or password');
+    const r=await this.db.query('SELECT u.id,u.agency_id AS "agencyId",u.email,u.password_hash,a.name AS "companyName" FROM agency_users u JOIN agencies a ON a.id=u.agency_id WHERE lower(u.email)=$1 AND u.is_active=true AND a.is_active=true ORDER BY a.name',[email]);
+    const matches:any[]=[];
+    for(const candidate of r.rows){if(await this.verifyPassword(password,candidate.password_hash))matches.push(candidate);}
+    if(!matches.length)throw new UnauthorizedException('Invalid email or password');
+    if(agencyId){
+      const selected=matches.find(candidate=>candidate.agencyId===agencyId);
+      if(!selected)throw new UnauthorizedException('Invalid email or password');
+      return this.otp.issue(selected.email,selected.id,'company_auth');
+    }
+    if(matches.length>1)return {requiresWorkspaceSelection:true,workspaces:matches.map(candidate=>({agencyId:candidate.agencyId,companyName:candidate.companyName}))};
+    return this.otp.issue(matches[0].email,matches[0].id,'company_auth');
   }
 
   async resendLoginOtp(body:any){return this.otp.resend(body?.challengeId,'company_auth');}
