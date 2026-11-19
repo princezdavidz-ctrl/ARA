@@ -102,7 +102,10 @@ export class MpesaService {
       }
       await client.query(`UPDATE billing_payments SET status='succeeded',provider_payment_ref=$2,provider_payload=$3,updated_at=now() WHERE id=$1`,[p.id,receipt,JSON.stringify({receipt,amount:paidAmount,phone,checkoutId})]);
       await client.query(`UPDATE billing_invoices SET status='paid',paid_at=COALESCE(paid_at,now()) WHERE id=$1 AND agency_id=$2`,[p.invoice_id,p.agency_id]);
-      if(invoice.rows[0].subscription_id) await client.query(`UPDATE company_subscriptions SET status='active',updated_at=now() WHERE id=$1 AND agency_id=$2 AND status IN ('past_due','suspended')`,[invoice.rows[0].subscription_id,p.agency_id]);
+      if(invoice.rows[0].subscription_id) {
+        await client.query(`UPDATE company_subscriptions SET status='cancelled',cancel_at_period_end=false,updated_at=now() WHERE agency_id=$1 AND id<>$2 AND status IN ('active','trialing','past_due')`,[p.agency_id,invoice.rows[0].subscription_id]);
+        await client.query(`UPDATE company_subscriptions SET status='active',updated_at=now() WHERE id=$1 AND agency_id=$2 AND status='suspended'`,[invoice.rows[0].subscription_id,p.agency_id]);
+      }
       return {ResultCode:0,ResultDesc:'Accepted'};
     });
   }
