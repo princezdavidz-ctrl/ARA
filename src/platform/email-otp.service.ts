@@ -88,11 +88,13 @@ export class EmailOtpService {
       };
       console.error('[ARA][SMTP] Gmail OTP delivery failed', diagnostic);
       const code = diagnostic.code;
-      const hint = code === 'ETIMEDOUT' || code === 'ECONNECTION' || code === 'ESOCKET'
-        ? 'If ARA is running on a Render Free web service, outbound SMTP ports 25, 465 and 587 are blocked. Use an HTTPS email API or upgrade this backend to a paid Render instance; changing Gmail credentials or TLS settings will not remove this network restriction.'
-        : code === 'EAUTH' || diagnostic.responseCode === 535
-          ? 'Gmail rejected SMTP authentication. Generate a fresh Google App Password and confirm SMTP_USER is the matching Gmail account.'
-          : 'Check the Gmail SMTP sender, app password and authorised sender address.';
+      const hint = code === 'ERESEND'
+        ? 'Resend email delivery failed. Confirm RESEND_API_KEY is valid and ARA_AUTH_EMAIL_FROM uses a sender domain verified in Resend.'
+        : code === 'ETIMEDOUT' || code === 'ECONNECTION' || code === 'ESOCKET'
+          ? 'If ARA is running on a Render Free web service, outbound SMTP ports 25, 465 and 587 are blocked. Configure RESEND_API_KEY and a verified ARA_AUTH_EMAIL_FROM sender, or upgrade this backend to a paid Render instance.'
+          : code === 'EAUTH' || diagnostic.responseCode === 535
+            ? 'Gmail rejected SMTP authentication. Generate a fresh Google App Password and confirm SMTP_USER is the matching Gmail account.'
+            : 'Check the configured email provider, API key or authorised sender address.';
       throw new ServiceUnavailableException('We could not send the verification email. ' + hint);
     } finally {
       transporter?.close();
