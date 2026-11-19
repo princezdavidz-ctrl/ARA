@@ -31,6 +31,12 @@ export class BillingController {
   @UseGuards(PlatformAdminGuard) @Get('admin/billing/usage')
   platformUsage(@Req() req:{platformAdmin:PlatformAdmin}){return this.billing.platformUsageSummary(req.platformAdmin);}
 
+  @UseGuards(AuthGuard) @Get('platform/billing/plans')
+  tenantPlans(@Req() req:{user:AraUser}){return this.billing.listTenantPlans(req.user);}
+
+  @UseGuards(AuthGuard) @Post('platform/billing/subscribe/:planId')
+  purchasePlan(@Req() req:{user:AraUser},@Param('planId') planId:string,@Body() body:unknown){return this.billing.purchasePlan(req.user,planId,body);}
+
   @UseGuards(AuthGuard) @Get('platform/billing')
   tenantSummary(@Req() req:{user:AraUser}){return this.billing.tenantSummary(req.user);}
 
