@@ -56,7 +56,6 @@ function loginView(){
   document.getElementById('toggle-login-password').onclick=function(){var visible=password.type==='text';password.type=visible?'password':'text';this.textContent=visible?'Show':'Hide';this.setAttribute('aria-label',visible?'Show password':'Hide password');this.setAttribute('aria-pressed',String(!visible));password.focus();};
   password.addEventListener('keyup',function(event){document.getElementById('caps-lock-hint').hidden=!event.getModifierState('CapsLock');});
   password.addEventListener('blur',function(){document.getElementById('caps-lock-hint').hidden=true;});
-  slug.addEventListener('input',function(){this.value=this.value.toLowerCase().trim().replace(/\s+/g,'-');});
   form.addEventListener('submit',async function(e){
     e.preventDefault();setError('login-error','');
     if(!form.reportValidity())return;
