@@ -10,15 +10,16 @@ async function main() {
     await client.query('BEGIN');
     await client.query("SELECT pg_advisory_xact_lock(hashtext('ara:migration:021_email_otp_auth'))");
     await client.query('CREATE TABLE IF NOT EXISTS ara_schema_migrations (name text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())');
-    const migrationName = '021_email_otp_auth.sql';
-    const applied = await client.query('SELECT 1 FROM ara_schema_migrations WHERE name=$1', [migrationName]);
-    if (!applied.rowCount) {
-      const sql = fs.readFileSync(path.join(__dirname, '..', 'migrations', migrationName), 'utf8');
-      await client.query(sql);
-      await client.query('INSERT INTO ara_schema_migrations(name) VALUES($1)', [migrationName]);
-      process.stdout.write('Applied ' + migrationName + '\\n');
-    } else {
-      process.stdout.write(migrationName + ' already applied\\n');
+    for (const migrationName of ['021_email_otp_auth.sql', '022_company_branding.sql']) {
+      const applied = await client.query('SELECT 1 FROM ara_schema_migrations WHERE name=$1', [migrationName]);
+      if (!applied.rowCount) {
+        const sql = fs.readFileSync(path.join(__dirname, '..', 'migrations', migrationName), 'utf8');
+        await client.query(sql);
+        await client.query('INSERT INTO ara_schema_migrations(name) VALUES($1)', [migrationName]);
+        process.stdout.write('Applied ' + migrationName + '\\n');
+      } else {
+        process.stdout.write(migrationName + ' already applied\\n');
+      }
     }
     await client.query('COMMIT');
   } catch (error) {

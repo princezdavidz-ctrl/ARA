@@ -5,6 +5,8 @@ import { AuthGuard, AraUser } from './auth.guard';
 export class PlatformController {
   constructor(private readonly platform:PlatformService){}
   @Post('register') register(@Body() body:unknown){return this.platform.register(body);}
+  @UseGuards(AuthGuard) @Get('brand-profile') brandProfile(@Req() req:{user:AraUser}){return this.platform.brandProfile(req.user);}
+  @UseGuards(AuthGuard) @Post('brand-profile') updateBrandProfile(@Req() req:{user:AraUser},@Body() body:unknown){return this.platform.updateBrandProfile(req.user,body);}
   @Post('login') login(@Body() body:unknown){return this.platform.login(body);}
   @Post('verify-otp') verifyOtp(@Body() body:unknown){return this.platform.verifyLoginOtp(body);}
   @Post('resend-otp') resendOtp(@Body() body:any){return this.platform.resendLoginOtp(body);}

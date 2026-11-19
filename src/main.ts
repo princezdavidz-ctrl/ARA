@@ -2,10 +2,13 @@ import 'reflect-metadata';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import helmet from 'helmet';
+import express from 'express';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { rawBody: true });
+  const app = await NestFactory.create(AppModule, { rawBody: true, bodyParser: false });
+  app.use(express.json({ limit: '2mb', verify: (req: any, _res, buffer) => { req.rawBody = Buffer.from(buffer); } }));
+  app.use(express.urlencoded({ extended: true, limit: '2mb' }));
   app.use(helmet());
   const allowedOrigins = new Set([
     'https://ara-dashboard-one.vercel.app',
