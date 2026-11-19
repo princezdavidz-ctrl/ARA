@@ -1,0 +1,1 @@
+window.ARA_API_BASE_URL=window.ARA_API_BASE_URL||(location.hostname==='localhost'?'http://localhost:3000':'https://ara-api-c525.onrender.com');
