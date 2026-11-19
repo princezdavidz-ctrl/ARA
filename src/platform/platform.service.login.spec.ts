@@ -9,7 +9,7 @@ describe('PlatformService company login without workspace ID',()=>{
   const setup=()=>{
     const db:any={query:jest.fn().mockResolvedValue({rows})};
     const otp:any={issue:jest.fn().mockResolvedValue({challengeId:'challenge-1',email:'owner@example.com'})};
-    const service:any=new PlatformService(db,{} as any,{} as any,otp);
+    const service:any=new PlatformService(db,{} as any,{} as any,otp,{} as any,{} as any,{} as any);
     service.verifyPassword=jest.fn(async(password:string,hash:string)=>password==='correct-password'&&(hash==='hash-1'||hash==='hash-2'));
     return {service,db,otp};
   };
