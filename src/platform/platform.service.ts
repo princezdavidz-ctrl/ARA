@@ -137,6 +137,34 @@ export class PlatformService implements OnApplicationBootstrap {
     return this.otp.issue(matches[0].email,matches[0].id,'company_auth');
   }
 
+
+  async requestCompanyPasswordReset(body:any){
+    const email=String(body?.email||'').trim().toLowerCase();
+    if(!/^\\S+@\\S+\\.\\S+$/.test(email))throw new BadRequestException('Enter a valid account email address.');
+    const found=await this.db.query("SELECT u.id FROM agency_users u JOIN agencies a ON a.id=u.agency_id WHERE lower(u.email)=$1 AND u.is_active=true AND a.is_active=true ORDER BY u.created_at ASC NULLS LAST LIMIT 1",[email]);
+    if(!found.rowCount){
+      return {requiresOtp:true,challengeId:randomBytes(16).toString('hex')+'-'+randomBytes(2).toString('hex')+'-4'+randomBytes(2).toString('hex')+'-a'+randomBytes(2).toString('hex')+'-'+randomBytes(6).toString('hex'),email,expiresIn:300,resendAfter:60,message:'If an active ARA account exists for this email, a reset code has been sent.'};
+    }
+    const challenge=await this.otp.issue(email,found.rows[0].id,'company_password_reset');
+    return {...challenge,message:'If an active ARA account exists for this email, a reset code has been sent.'};
+  }
+
+  async resetCompanyPassword(body:any){
+    const challengeId=String(body?.challengeId||''),code=String(body?.code||''),password=String(body?.newPassword||'');
+    if(password.length<12||password.length>256)throw new BadRequestException('Your new password must be 12–256 characters.');
+    const verified=await this.otp.verify(challengeId,code,'company_password_reset');
+    const passwordHash=await this.hashPassword(password);
+    return this.db.transaction(async c=>{
+      const accounts=await c.query("SELECT u.id,u.agency_id AS \"agencyId\" FROM agency_users u JOIN agencies a ON a.id=u.agency_id WHERE lower(u.email)=lower($1) AND u.is_active=true AND a.is_active=true FOR UPDATE OF u",[verified.email]);
+      if(!accounts.rowCount||!accounts.rows.some((account:any)=>account.id===verified.principalId))throw new UnauthorizedException('This reset request is invalid or expired. Request a new code.');
+      const ids=accounts.rows.map((account:any)=>account.id);
+      await c.query('UPDATE agency_users SET password_hash=$1 WHERE id=ANY($2::uuid[])',[passwordHash,ids]);
+      await c.query('UPDATE refresh_sessions SET revoked_at=now() WHERE user_id=ANY($1::uuid[]) AND revoked_at IS NULL',[ids]);
+      await c.query("INSERT INTO audit_logs(agency_id,actor_user_id,action,target_type,target_id,details) SELECT u.agency_id,u.id,'company.password_reset','user',u.id::text,'{}'::jsonb FROM agency_users u WHERE u.id=ANY($1::uuid[])",[ids]);
+      return {success:true,message:'Your password has been reset. All existing sessions have been signed out. You can now sign in.'};
+    });
+  }
+
   async resendLoginOtp(body:any){return this.otp.resend(body?.challengeId,'company_auth');}
 
   async verifyLoginOtp(body:any){
