@@ -219,21 +219,69 @@ async function team(){
   if(canManage)document.querySelectorAll('[data-deactivate]').forEach(function(b){b.onclick=async function(){if(!confirm('Deactivate this user and revoke their refresh sessions?'))return;try{await api('/platform/team/'+encodeURIComponent(b.dataset.deactivate)+'/deactivate',{method:'POST',body:'{}'});await team();}catch(error){alert(error.message);}};});
 }
 function registerView(){
-  app.innerHTML='<main class="login-wrap"><section class="login-visual"><div class="login-brand"><span class="brand-mark">✦</span><div><strong>ARA</strong><small>AUTONOMOUS RESPOND AGENT</small></div></div><div class="login-copy"><span class="eyebrow">START YOUR WORKSPACE</span><h1>Your business.<br><em>Your brand. Your inbox.</em></h1><p>Create a workspace that carries your company identity across your customer operations.</p><div class="login-points"><span>● Private company workspace</span><span>● Your own logo and colours</span><span>● Supervised AI from day one</span></div></div><div class="login-visual-foot">SECURE OPERATIONS · TENANT-AWARE · AUDIT READY</div></section><form id="register" class="login register-login"><div class="mobile-brand brand">ARA<small>CREATE COMPANY ACCOUNT</small></div><span class="eyebrow">GET STARTED</span><h1>Create your company workspace</h1><p class="muted">Start with your company identity. You can change it later.</p><section class="brand-setup"><div class="brand-setup-head"><div><strong>Company identity</strong><small>These details personalise your entire workspace.</small></div><div id="brand-logo-preview" class="brand-logo-preview">✦</div></div><label class="field">Company name<input name="agencyName" required minlength="2" maxlength="120" autocomplete="organization" placeholder="Your company name"></label><label class="field">Company logo <span class="optional">Optional · PNG, JPG or WebP · Max 1 MB</span><input id="company-logo" name="companyLogo" type="file" accept="image/png,image/jpeg,image/webp"></label><div class="brand-colours"><label class="field">Primary colour<input name="primaryColor" type="color" value="#10b981"></label><label class="field">Accent colour<input name="accentColor" type="color" value="#0f172a"></label></div><div class="brand-preview" id="brand-preview"><span id="brand-preview-mark">✦</span><strong id="brand-preview-name">Your company</strong><small>WORKSPACE PREVIEW</small></div></section><label class="field">Your full name<input name="fullName" required minlength="2" maxlength="120" autocomplete="name" placeholder="Full name"></label><label class="field">Work email<input name="email" type="email" required autocomplete="email" placeholder="you@company.com"></label><label class="field">Password<input name="password" type="password" required minlength="12" maxlength="256" autocomplete="new-password" placeholder="At least 12 characters"></label><label class="field">Confirm password<input name="confirmPassword" type="password" required minlength="12" maxlength="256" autocomplete="new-password" placeholder="Re-enter your password"></label><button type="submit">Create workspace <span aria-hidden="true">→</span></button><p id="register-error" class="error" role="alert"></p><p class="auth-switch">Already have an account? <button type="button" id="show-login" class="text-link">Sign in</button></p><p class="login-security">Your company data is isolated from every other workspace.</p></form></main>';
-  document.getElementById('show-login').onclick=function(){history.replaceState(null,'',location.pathname+'?mode=login');loginView();};
-  var logoInput=document.getElementById('company-logo'),logoDataUrl='';
-  function previewBrand(){var d=new FormData(document.getElementById('register')),name=String(d.get('agencyName')||'Your company');document.getElementById('brand-preview-name').textContent=name;document.getElementById('brand-preview').style.setProperty('--preview-primary',d.get('primaryColor'));document.getElementById('brand-preview').style.setProperty('--preview-accent',d.get('accentColor'));document.getElementById('brand-preview-mark').textContent=logoDataUrl?'':'✦';document.getElementById('brand-logo-preview').innerHTML=logoDataUrl?'<img alt="Company logo preview" src="'+logoDataUrl+'">':'✦';}
-  document.getElementById('register').addEventListener('input',previewBrand);
-  logoInput.addEventListener('change',function(){var file=logoInput.files&&logoInput.files[0];logoDataUrl='';if(!file){previewBrand();return;}if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>1024*1024){logoInput.value='';setError('register-error',{message:'Choose a PNG, JPEG or WebP logo smaller than 1 MB.'});previewBrand();return;}var reader=new FileReader();reader.onload=function(){logoDataUrl=String(reader.result||'');previewBrand();};reader.onerror=function(){setError('register-error',{message:'Could not read that logo. Please try another file.'});};reader.readAsDataURL(file);});
-  document.getElementById('register').addEventListener('submit',async function(e){
-    e.preventDefault();var form=e.currentTarget,button=form.querySelector('button[type="submit"]'),data=new FormData(form);
+  var step=1,logoDataUrl='';
+  app.innerHTML='<main class="register-page"><aside class="register-aside"><a class="register-brand" href="#" aria-label="ARA home"><span class="brand-mark">✦</span><span><strong>ARA</strong><small>COMPANY WORKSPACE</small></span></a><div class="register-aside-copy"><span class="eyebrow">YOUR BUSINESS, CONNECTED</span><h1>Every customer conversation.<br><em>One intelligent workspace.</em></h1><p>Set up your company space, bring your channels together and give your team the tools to respond with confidence.</p><div class="register-benefits"><span><i>✓</i> Your own branded workspace</span><span><i>✓</i> One place for every channel</span><span><i>✓</i> Human-supervised AI replies</span></div></div><div class="register-aside-foot">PRIVATE BY DESIGN <span>·</span> BUILT FOR TEAMS</div></aside><section class="register-main"><div class="register-mobile-brand">✦ <strong>ARA</strong></div><div class="register-card"><div class="register-heading"><span class="eyebrow">GET STARTED</span><h2 id="register-title">Tell us about your company</h2><p id="register-description">First, let’s set up the identity of your company workspace.</p></div><div class="register-progress" aria-label="Registration progress"><div class="register-progress-step active" id="progress-one"><span>1</span><small>Company details</small></div><div class="register-progress-line" id="progress-line"></div><div class="register-progress-step" id="progress-two"><span>2</span><small>Your account</small></div></div><form id="register" novalidate><section id="register-step-company" class="register-step"><div class="register-section-title"><span class="register-section-icon">▦</span><div><strong>Company details</strong><small>This is how your workspace will appear to your team.</small></div></div><label class="field">Company name<input name="agencyName" required minlength="2" maxlength="120" autocomplete="organization" placeholder="e.g. Acme Solutions"></label><div class="register-logo-row"><div><label class="field">Company logo <span class="optional">Optional · PNG, JPG or WebP · Max 1 MB</span><input id="company-logo" name="companyLogo" type="file" accept="image/png,image/jpeg,image/webp"></label></div><div id="brand-logo-preview" class="brand-logo-preview" aria-label="Logo preview">✦</div></div><div class="register-colour-heading"><strong>Choose your brand colours</strong><span>Customise the look of your workspace</span></div><div class="brand-colours"><label class="field">Primary colour<input name="primaryColor" type="color" value="#10b981"></label><label class="field">Accent colour<input name="accentColor" type="color" value="#0f172a"></label></div><div class="brand-preview" id="brand-preview"><span id="brand-preview-mark">✦</span><strong id="brand-preview-name">Your company</strong><small>WORKSPACE PREVIEW</small></div></section><section id="register-step-account" class="register-step" hidden><div class="register-section-title"><span class="register-section-icon">♙</span><div><strong>Account owner details</strong><small>Create the first administrator account for your company.</small></div></div><label class="field">Your full name<input name="fullName" required minlength="2" maxlength="120" autocomplete="name" placeholder="e.g. Alex Morgan"></label><label class="field">Work email<input name="email" type="email" required autocomplete="email" placeholder="you@company.com"></label><label class="field">Create password<input name="password" type="password" required minlength="12" maxlength="256" autocomplete="new-password" placeholder="At least 12 characters"></label><label class="field">Confirm password<input name="confirmPassword" type="password" required minlength="12" maxlength="256" autocomplete="new-password" placeholder="Enter the same password again"></label><div class="register-security-note"><span>🔒</span><p>Your account is protected with email verification. Your company data remains isolated from other workspaces.</p></div></section><p id="register-error" class="error" role="alert"></p><div class="register-actions"><button type="button" id="register-back" class="secondary" hidden>← Back</button><button type="button" id="register-next">Continue <span aria-hidden="true">→</span></button><button type="submit" id="register-submit" hidden>Create company account <span aria-hidden="true">→</span></button></div></form><p class="auth-switch">Already have an account? <button type="button" id="show-login" class="text-link">Sign in</button></p></div><footer class="register-footer">© ARA · Secure company communication workspace</footer></section></main>';
+  var form=document.getElementById('register'),logoInput=document.getElementById('company-logo');
+  function previewBrand(){
+    var d=new FormData(form),name=String(d.get('agencyName')||'Your company');
+    document.getElementById('brand-preview-name').textContent=name;
+    document.getElementById('brand-preview').style.setProperty('--preview-primary',d.get('primaryColor')||'#10b981');
+    document.getElementById('brand-preview').style.setProperty('--preview-accent',d.get('accentColor')||'#0f172a');
+    document.getElementById('brand-preview-mark').textContent=logoDataUrl?'':'✦';
+    document.getElementById('brand-logo-preview').innerHTML=logoDataUrl?'<img alt="Company logo preview" src="'+logoDataUrl+'">':'✦';
+  }
+  function setStep(next){
+    step=next;
+    document.getElementById('register-step-company').hidden=step!==1;
+    document.getElementById('register-step-account').hidden=step!==2;
+    document.getElementById('register-title').textContent=step===1?'Tell us about your company':'Create your account';
+    document.getElementById('register-description').textContent=step===1?'First, let’s set up the identity of your company workspace.':'Next, add the details for the person who will manage this workspace.';
+    document.getElementById('progress-one').classList.toggle('active',step===1);
+    document.getElementById('progress-one').classList.toggle('complete',step===2);
+    document.getElementById('progress-two').classList.toggle('active',step===2);
+    document.getElementById('progress-line').classList.toggle('complete',step===2);
+    document.getElementById('register-back').hidden=step===1;
+    document.getElementById('register-next').hidden=step===2;
+    document.getElementById('register-submit').hidden=step!==2;
     setError('register-error','');
-    if(data.get('password')!==data.get('confirmPassword')){setError('register-error','Passwords do not match.');return;}
-    button.disabled=true;
-    try{var result=await api('/platform/register',{method:'POST',body:JSON.stringify({agencyName:data.get('agencyName'),fullName:data.get('fullName'),email:data.get('email'),password:data.get('password'),logoDataUrl:logoDataUrl,primaryColor:data.get('primaryColor'),accentColor:data.get('accentColor')})});companyOtpView(result);}
-    catch(error){setError('register-error',error);}
+    var first=form.querySelector(step===1?'[name="agencyName"]':'[name="fullName"]');
+    if(first)first.focus();
+  }
+  function validateStep(){
+    var section=document.getElementById(step===1?'register-step-company':'register-step-account');
+    var fields=Array.prototype.slice.call(section.querySelectorAll('input[required]'));
+    for(var i=0;i<fields.length;i++){
+      if(!fields[i].checkValidity()){fields[i].reportValidity();return false;}
+    }
+    if(step===1&&String(form.elements.agencyName.value).trim().length<2){setError('register-error','Enter a company name with at least 2 characters.');return false;}
+    if(step===2){
+      if(form.elements.password.value.length<12){setError('register-error','Use a password with at least 12 characters.');return false;}
+      if(form.elements.password.value!==form.elements.confirmPassword.value){setError('register-error','Passwords do not match.');return false;}
+    }
+    setError('register-error','');return true;
+  }
+  document.getElementById('register-next').onclick=function(){if(validateStep())setStep(2);};
+  document.getElementById('register-back').onclick=function(){setStep(1);};
+  document.getElementById('show-login').onclick=function(){history.replaceState(null,'',location.pathname+'?mode=login');loginView();};
+  form.addEventListener('input',previewBrand);
+  logoInput.addEventListener('change',function(){
+    var file=logoInput.files&&logoInput.files[0];logoDataUrl='';
+    if(!file){previewBrand();return;}
+    if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>1024*1024){logoInput.value='';setError('register-error',{message:'Choose a PNG, JPEG or WebP logo smaller than 1 MB.'});previewBrand();return;}
+    var reader=new FileReader();reader.onload=function(){logoDataUrl=String(reader.result||'');previewBrand();};reader.onerror=function(){setError('register-error',{message:'Could not read that logo. Please try another file.'});};reader.readAsDataURL(file);
+  });
+  form.addEventListener('submit',async function(e){
+    e.preventDefault();if(step!==2||!validateStep())return;
+    var button=document.getElementById('register-submit'),data=new FormData(form);
+    button.disabled=true;setError('register-error','');
+    try{
+      var result=await api('/platform/register',{method:'POST',body:JSON.stringify({agencyName:data.get('agencyName'),fullName:data.get('fullName'),email:data.get('email'),password:data.get('password'),logoDataUrl:logoDataUrl,primaryColor:data.get('primaryColor'),accentColor:data.get('accentColor')})});
+      companyOtpView(result);
+    }catch(error){setError('register-error',error);}
     finally{button.disabled=false;}
   });
+  document.getElementById('register-back').hidden=true;
+  document.getElementById('register-submit').hidden=true;
   previewBrand();
 }
 function render(){token='';refresh='';user=null;sessionStorage.removeItem('ara_crm_token');sessionStorage.removeItem('ara_crm_refresh');sessionStorage.removeItem('ara_crm_user');if(new URLSearchParams(location.search).get('mode')==='register')registerView();else loginView();}
