@@ -37,7 +37,7 @@ export class EmailOtpService {
     if (recent.rowCount) throw new HttpException('Please wait 60 seconds before requesting another code.', 429);
 
     // Fixed OTP is permitted only in explicitly marked staging environments.
-    const code = testOtpEnabled ? '123456' : String(randomInt(0, 1000000)).padStart(6, '0');
+    const code = testOtpEnabled ? '127457' : String(randomInt(0, 1000000)).padStart(6, '0');
     const challengeId = randomUUID();
     await this.db.query(
       'UPDATE auth_email_otps SET consumed_at=now() WHERE lower(email)=lower($1) AND purpose=$2 AND consumed_at IS NULL',
@@ -104,7 +104,7 @@ export class EmailOtpService {
       transporter?.close();
     }
 
-    return { requiresOtp: true, challengeId, email, expiresIn: 300, resendAfter: 60, message: testOtpEnabled ? 'Staging test code is 123456. This code is not available in production.' : 'A six-digit verification code has been sent to your email.' };
+    return { requiresOtp: true, challengeId, email, expiresIn: 300, resendAfter: 60, message: testOtpEnabled ? 'Staging test code is 127457. This code is not available in production.' : 'A six-digit verification code has been sent to your email.' };
   }
 
   async resend(challengeIdValue: string, purpose: OtpPurpose) {
