@@ -7,7 +7,9 @@ ENV OLLAMA_HOST=0.0.0.0:11434 \
     OLLAMA_MAX_LOADED_MODELS=1 \
     OLLAMA_KEEP_ALIVE=30s
 
+COPY entrypoint.sh /usr/local/bin/ollama-entrypoint.sh
+RUN chmod 755 /usr/local/bin/ollama-entrypoint.sh
+
 EXPOSE 11434
 
-ENTRYPOINT ["/bin/ollama"]
-CMD ["serve"]
+ENTRYPOINT ["/usr/local/bin/ollama-entrypoint.sh"]
