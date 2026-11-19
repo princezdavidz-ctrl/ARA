@@ -27,7 +27,7 @@ export class LocalLlmService {
           stream: false,
           format: 'json',
           messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
-          options: { temperature: 0, num_ctx: 512, num_predict: 512 },
+          options: { temperature: 0, num_ctx: 512, num_predict: 128, num_thread: 2 },
         }),
         signal: AbortSignal.timeout(this.config.get('LOCAL_LLM_TIMEOUT_MS')),
       });
