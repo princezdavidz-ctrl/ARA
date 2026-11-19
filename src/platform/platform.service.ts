@@ -150,7 +150,7 @@ export class PlatformService implements OnApplicationBootstrap {
   async team(u:User){this.requireRole(u,['owner','admin','manager']);return (await this.db.query('SELECT id,email,full_name AS "fullName",role,is_active AS "isActive",created_at AS "createdAt" FROM agency_users WHERE agency_id=$1 ORDER BY created_at',[u.agencyId])).rows;}
   async teamPresence(u:User){
     return (await this.db.query(`SELECT a.id,a.full_name AS "fullName",a.role,
-      COALESCE(p.is_online=false OR p.last_seen_at<now()-interval '90 seconds',true) AS "isOnline",
+      COALESCE(p.is_online AND p.last_seen_at>=now()-interval '90 seconds',false) AS "isOnline",
       p.last_seen_at AS "lastSeenAt"
       FROM agency_users a LEFT JOIN agency_user_presence p ON p.user_id=a.id AND p.agency_id=a.agency_id
       WHERE a.agency_id=$1 AND a.is_active=true ORDER BY a.full_name`,[u.agencyId])).rows;
