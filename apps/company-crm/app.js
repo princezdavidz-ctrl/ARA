@@ -71,17 +71,17 @@ function passwordResetCodeView(email,challenge){
   document.getElementById('reset-back-login').onclick=loginView;
   form.addEventListener('submit',async function(event){
     event.preventDefault();if(!form.reportValidity())return;
-    var data=new FormData(form),code=String(data.get('code')||'').trim(),newPassword=String(data.get('newPassword')||''),confirmPassword=String(data.get('confirmPassword')||'');
+    var data=new FormData(form),code=String(data.get('code')||'').trim(),newPassword=String(data.get('newPassword')||''),confirmPassword=String(data.get('confirmPassword')||''),completed=false;
     setError('password-reset-error','');
     if(newPassword!==confirmPassword){setError('password-reset-error','The passwords do not match.');return;}
     button.disabled=true;button.textContent='Resetting password…';
     try{
       var result=await api('/platform/reset-password',{method:'POST',body:JSON.stringify({challengeId:challenge.challengeId,code:code,newPassword:newPassword})});
       document.getElementById('password-reset-success').textContent=result.message||'Password reset successfully. You can now sign in.';
-      form.querySelectorAll('input,button').forEach(function(control){control.disabled=true;});
+      form.querySelectorAll('input,button').forEach(function(control){control.disabled=true;});completed=true;
       setTimeout(loginView,1800);
     }catch(error){setError('password-reset-error',error);}
-    finally{if(document.getElementById('password-reset-submit')){button.disabled=false;button.innerHTML='Reset password <span aria-hidden="true">→</span>';}}
+    finally{if(!completed&&document.getElementById('password-reset-submit')){button.disabled=false;button.innerHTML='Reset password <span aria-hidden="true">→</span>';}}
   });
 }
 
