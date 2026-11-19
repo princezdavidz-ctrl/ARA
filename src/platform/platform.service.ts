@@ -207,6 +207,13 @@ export class PlatformService implements OnApplicationBootstrap {
   async assign(u:User,id:string,b:any){this.requireRole(u,['owner','admin','manager']);const target=String(b?.userId||'');const r=await this.db.query('UPDATE conversations c SET assigned_user_id=$3,updated_at=now() WHERE c.id=$1 AND c.agency_id=$2 AND EXISTS(SELECT 1 FROM agency_users a WHERE a.id=$3 AND a.agency_id=$2 AND a.is_active=true) RETURNING c.*',[id,u.agencyId,target]);if(!r.rowCount)throw new NotFoundException('Conversation or active team member not found');return r.rows[0];}
   async escalations(u:User){return (await this.db.query('SELECT * FROM escalations WHERE agency_id=$1 AND status<>\'resolved\' ORDER BY created_at',[u.agencyId])).rows;}
   async createEscalation(u:User,id:string,b:any){const reason=String(b?.reason||'').trim();if(!reason)throw new BadRequestException('Escalation reason required');const r=await this.db.query('INSERT INTO escalations(agency_id,conversation_id,reason) SELECT $1,id,$3 FROM conversations WHERE id=$2 AND agency_id=$1 RETURNING *',[u.agencyId,id,reason]);if(!r.rowCount)throw new NotFoundException('Conversation not found');await this.db.query('UPDATE conversations SET status=\'pending\',updated_at=now() WHERE id=$1 AND agency_id=$2',[id,u.agencyId]);return r.rows[0];}
-  async claimEscalation(u:User,id:string){const r=await this.db.query('UPDATE escalations SET status=\'claimed\',claimed_by=$3 WHERE id=$1 AND agency_id=$2 AND status=\'open\' RETURNING *',[id,u.agencyId,u.id]);if(!r.rowCount)throw new NotFoundException('Open escalation not found');return r.rows[0];}
+  async claimEscalation(u:User,id:string){
+    return this.db.transaction(async client=>{
+      const r=await client.query("UPDATE escalations SET status='claimed',claimed_by=$3 WHERE id=$1 AND agency_id=$2 AND status='open' RETURNING *",[id,u.agencyId,u.id]);
+      if(!r.rowCount)throw new NotFoundException('Open escalation not found');
+      await client.query("UPDATE conversations SET assigned_user_id=$3,status='pending',updated_at=now() WHERE id=$1 AND agency_id=$2",[r.rows[0].conversation_id,u.agencyId,u.id]);
+      return r.rows[0];
+    });
+  }
   async resolveEscalation(u:User,id:string){const r=await this.db.query('UPDATE escalations SET status=\'resolved\',resolved_by=$3,resolved_at=now() WHERE id=$1 AND agency_id=$2 AND status IN (\'open\',\'claimed\') RETURNING *',[id,u.agencyId,u.id]);if(!r.rowCount)throw new NotFoundException('Unresolved escalation not found');return r.rows[0];}
 }
