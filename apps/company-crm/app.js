@@ -51,8 +51,31 @@ function applyCompanyBrand(profile){
   var top=document.getElementById('page-subtitle');if(top&&profile.companyName)top.textContent=profile.companyName+' · '+top.textContent;
 }
 
+function mountCompanyAssistant(){
+  var shell=document.querySelector('.app-shell');if(!shell||document.getElementById('company-ai-assistant'))return;
+  shell.insertAdjacentHTML('beforeend','<aside id="company-ai-assistant" class="company-ai-assistant"><section class="company-ai-panel" id="company-ai-panel" hidden><header><div><strong>Company AI Assistant</strong><small>Uses your company knowledge base</small></div><button type="button" class="secondary" id="company-ai-close" aria-label="Close assistant">×</button></header><div class="company-ai-messages" id="company-ai-messages" aria-live="polite"><div class="company-ai-bubble assistant">Hello! Ask me about your company products, services, policies or other information in your approved Knowledge Base.</div></div><form id="company-ai-form"><input name="message" maxlength="5000" required minlength="2" placeholder="Ask your company assistant…" aria-label="Message"><button type="submit" aria-label="Send message">Send</button></form><p class="company-ai-note">Answers use this company’s knowledge only. Unverified questions are sent for human review.</p></section><button type="button" class="company-ai-launcher" id="company-ai-open">✧ Ask your AI</button></aside>');
+  var panel=document.getElementById('company-ai-panel'),messages=document.getElementById('company-ai-messages'),form=document.getElementById('company-ai-form'),open=document.getElementById('company-ai-open');
+  function addMessage(role,text,meta){var bubble=document.createElement('div');bubble.className='company-ai-bubble '+role;bubble.textContent=text;messages.appendChild(bubble);if(meta){var note=document.createElement('small');note.className='company-ai-meta';note.textContent=meta;messages.appendChild(note);}messages.scrollTop=messages.scrollHeight;}
+  open.onclick=function(){panel.hidden=false;open.hidden=true;form.querySelector('input').focus();};
+  document.getElementById('company-ai-close').onclick=function(){panel.hidden=true;open.hidden=false;};
+  var nav=document.querySelector('.nav');if(nav&&!document.getElementById('open-company-ai')){var button=document.createElement('button');button.id='open-company-ai';button.type='button';button.innerHTML='<span class="nav-icon">✧</span>AI Assistant';button.onclick=open.click.bind(open);var account=nav.querySelector('[data-page="billing"]');nav.insertBefore(button,account||null);}
+  form.addEventListener('submit',async function(event){
+    event.preventDefault();var input=form.elements.message,question=input.value.trim(),send=form.querySelector('button[type="submit"]');if(question.length<2)return;
+    addMessage('user',question);input.value='';input.disabled=true;send.disabled=true;send.textContent='…';
+    var waiting=document.createElement('div');waiting.className='company-ai-bubble assistant';waiting.textContent='Checking your company knowledge…';messages.appendChild(waiting);messages.scrollTop=messages.scrollHeight;
+    try{
+      var result=await api('/answer',{method:'POST',body:JSON.stringify({message:question,preferredLanguage:'auto'})});
+      waiting.remove();
+      var citations=Array.isArray(result.citations)&&result.citations.length?'Sources: '+result.citations.map(function(x){return x.title;}).join(', '):'';
+      var status=result.status==='needs_human'?'Needs staff review. '+(result.escalationReason||''):'';
+      addMessage('assistant',result.answer||'I could not prepare an answer.',[status,citations].filter(Boolean).join(' · '));
+    }catch(error){waiting.remove();addMessage('assistant',error.message||'The assistant is unavailable. Please try again.');}
+    finally{input.disabled=false;send.disabled=false;send.textContent='Send';input.focus();}
+  });
+}
 function renderShell(){
   app.innerHTML='<div class="app-shell"><aside class="sidebar"><div class="brand brand-lockup"><span class="brand-mark">✦</span><span>ARA<small>COMPANY CRM</small></span></div><nav class="nav"><span class="nav-label">WORKSPACE</span><button data-page="overview"><span class="nav-icon">⌂</span>Overview</button><button data-page="inbox"><span class="nav-icon">▤</span>Inbox</button><button data-page="channels"><span class="nav-icon">⌁</span>Integrations</button><button data-page="knowledge"><span class="nav-icon">▧</span>Knowledge</button><span class="nav-label">ACCOUNT</span><button data-page="billing"><span class="nav-icon">◇</span>Billing</button><button data-page="ai-usage"><span class="nav-icon">✧</span>AI Usage</button><button data-page="team"><span class="nav-icon">♙</span>Team</button></nav><div class="side-foot">Tenant-isolated workspace<br>Company data stays within your account.</div></aside><header class="mobile-bar"><div class="brand-lockup"><span class="brand-mark">✦</span><strong>ARA</strong></div><select id="mobile-page" aria-label="Navigate workspace"><option value="overview">Overview</option><option value="inbox">Inbox</option><option value="channels">Integrations</option><option value="knowledge">Knowledge</option><option value="billing">Billing</option><option value="ai-usage">AI Usage</option><option value="team">Team</option></select></header><main class="main"><header class="topbar"><div><span class="eyebrow">COMPANY WORKSPACE</span><h1 id="page-title">Overview</h1><p id="page-subtitle">Company operations at a glance</p></div><div class="identity"><span id="identity"></span><button class="secondary" id="logout">Sign out</button></div></header><section id="content"><div class="empty">Loading workspace…</div></section></main></div>';
+  mountCompanyAssistant();
   document.getElementById('identity').textContent=(user?user.fullName+' · '+user.role:'');
   api('/platform/brand-profile').then(applyCompanyBrand).catch(function(){});
 
