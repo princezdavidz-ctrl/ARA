@@ -4,7 +4,7 @@ var app=document.getElementById('app');
 var token=sessionStorage.getItem('ara_crm_token')||'';
 var refresh=sessionStorage.getItem('ara_crm_refresh')||'';
 var user=JSON.parse(sessionStorage.getItem('ara_crm_user')||'null');
-var page='overview',selectedConversation='',pendingCompanyOtp=null,teamPresenceOnline=sessionStorage.getItem('ara_team_presence')==='online',teamPresenceTimer=null;
+var page='overview',selectedConversation='',pendingCompanyOtp=null,teamPresenceOnline=sessionStorage.getItem('ara_team_presence')==='online',teamPresenceTimer=null,handoffRefreshTimer=null;
 function base(){return String(window.ARA_API_BASE_URL||'').replace(/\/$/,'');}
 function url(path){return base()+path;}
 function esc(value){return String(value==null?'':value).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
@@ -126,14 +126,17 @@ function renderShell(){
   loadPage();
 }
 async function logout(){
-  try{if(teamPresenceTimer)clearInterval(teamPresenceTimer);if(token)fetch(url('/platform/team/presence'),{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({isOnline:false}),keepalive:true});if(refresh)await fetch(url('/platform/logout'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refreshToken:refresh})});}catch(e){}
+  try{if(teamPresenceTimer)clearInterval(teamPresenceTimer);if(handoffRefreshTimer)clearInterval(handoffRefreshTimer);if(token)fetch(url('/platform/team/presence'),{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({isOnline:false}),keepalive:true});if(refresh)await fetch(url('/platform/logout'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refreshToken:refresh})});}catch(e){}
   teamPresenceOnline=false;sessionStorage.removeItem('ara_team_presence');token='';refresh='';user=null;sessionStorage.removeItem('ara_crm_token');sessionStorage.removeItem('ara_crm_refresh');sessionStorage.removeItem('ara_crm_user');loginView();
 }
 function pageTitle(title,subtitle){document.getElementById('page-title').textContent=title;document.getElementById('page-subtitle').textContent=subtitle;app.querySelectorAll('[data-page]').forEach(function(b){b.classList.toggle('active',b.dataset.page===page);});var mobilePage=document.getElementById('mobile-page');if(mobilePage)mobilePage.value=page;}
 function table(headers,rows){return '<div class="panel table-wrap"><table class="data"><thead><tr>'+headers.map(function(h){return '<th>'+h+'</th>';}).join('')+'</tr></thead><tbody>'+(rows.length?rows.join(''):'<tr><td class="empty" colspan="'+headers.length+'">No records found</td></tr>')+'</tbody></table></div>';}
 async function loadPage(){
+  if(handoffRefreshTimer){clearInterval(handoffRefreshTimer);handoffRefreshTimer=null;}
   var content=document.getElementById('content');content.innerHTML='<div class="empty">Loading…</div>';
-  try{if(page==='overview')await overview();else if(page==='inbox')await inbox();else if(page==='handoff')await handoff();else if(page==='approvals')await approvals();else if(page==='channels')await channels();else if(page==='knowledge')await knowledge();else if(page==='billing')await billing();else if(page==='ai-usage')await aiUsage();else if(page==='team')await team();}
+  try{if(page==='overview')await overview();else if(page==='inbox')await inbox();else if(page==='handoff')await handoff();else if(page==='approvals')await approvals();else if(page==='channels')await channels();else if(page==='knowledge')await knowledge();else if(page==='billing')await billing();else if(page==='ai-usage')await aiUsage();else if(page==='team')await team();
+    if(page==='handoff')handoffRefreshTimer=setInterval(function(){if(page==='handoff')handoff().catch(function(){});},15000);
+  }
   catch(error){content.innerHTML='<div class="panel empty"><p>'+esc(error.message)+'</p><button class="secondary" id="retry">Retry</button></div>';var retry=document.getElementById('retry');if(retry)retry.onclick=loadPage;}
 }
 async function overview(){
