@@ -192,3 +192,10 @@ button:not(.secondary):not(.danger){background:var(--brand);box-shadow:0 5px 14p
 .nav button.active{background:color-mix(in srgb,var(--brand) 13%,transparent);border-color:color-mix(in srgb,var(--brand) 28%,transparent)}
 .nav button.active:before{background:var(--brand)}
 @media(max-width:600px){.register-login{max-height:none}.brand-setup{padding:13px}.brand-preview small{display:none}}
+
+/* Tenant brand tokens flow through the authenticated workspace */
+:root{--blue:var(--brand);--focus:0 0 0 3px color-mix(in srgb,var(--brand) 22%,transparent)}
+.sidebar{background:color-mix(in srgb,var(--brand-accent) 78%,#0b1422);border-color:color-mix(in srgb,var(--brand-accent) 45%,#334155)}
+.sidebar .brand-mark{background:var(--brand);color:#fff}
+.nav button:hover{background:color-mix(in srgb,var(--brand-accent) 17%,transparent)}
+.text-link{color:var(--brand)!important}
