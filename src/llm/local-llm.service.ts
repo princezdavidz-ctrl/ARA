@@ -13,17 +13,21 @@ export class LocalLlmService {
     }
     const baseUrl = this.config.get('LOCAL_LLM_BASE_URL').replace(/\/$/, '');
     const model = this.config.get('LOCAL_LLM_CHAT_MODEL');
+    const apiKey = this.config.get('LOCAL_LLM_API_KEY');
     let response: Response;
     try {
       response = await fetch(baseUrl + '/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(apiKey ? { Authorization: 'Bearer ' + apiKey } : {}),
+        },
         body: JSON.stringify({
           model,
           stream: false,
           format: 'json',
           messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
-          options: { temperature: 0 },
+          options: { temperature: 0, num_ctx: 512, num_predict: 512 },
         }),
         signal: AbortSignal.timeout(this.config.get('LOCAL_LLM_TIMEOUT_MS')),
       });
