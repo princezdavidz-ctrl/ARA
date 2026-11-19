@@ -143,7 +143,7 @@ export class PlatformService implements OnApplicationBootstrap {
     if(!/^\S+@\S+\.\S+$/.test(email))throw new BadRequestException('Enter a valid account email address.');
     const found=await this.db.query("SELECT u.id FROM agency_users u JOIN agencies a ON a.id=u.agency_id WHERE lower(u.email)=$1 AND u.is_active=true AND a.is_active=true ORDER BY u.created_at ASC NULLS LAST LIMIT 1",[email]);
     if(!found.rowCount){
-      return {requiresOtp:true,challengeId:randomUUID(),email,expiresIn:300,resendAfter:60,message:process.env.ARA_ENVIRONMENT==='staging'&&process.env.ARA_TEST_OTP_ENABLED==='true'?'Staging test code is 127457. This code is not available in production.':'If an active ARA account exists for this email, a reset code has been sent.'};
+      return {requiresOtp:true,challengeId:randomUUID(),email,expiresIn:300,resendAfter:60,message:'If an active ARA account exists for this email, a reset code has been sent.'};
     }
     const challenge=await this.otp.issue(email,found.rows[0].id,'company_password_reset');
     return {...challenge,message:process.env.ARA_ENVIRONMENT==='staging'&&process.env.ARA_TEST_OTP_ENABLED==='true'?challenge.message:'If an active ARA account exists for this email, a reset code has been sent.'};
