@@ -7,12 +7,15 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true, bodyParser: false });
+  // Configure the Express adapter directly; Nest's INestApplication does not expose app.set().
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
   app.use(express.json({ limit: '2mb', verify: (req: any, _res, buffer) => { req.rawBody = Buffer.from(buffer); } }));
   app.use(express.urlencoded({ extended: true, limit: '2mb' }));
   app.use(helmet());
   const allowedOrigins = new Set([
     'https://ara-dashboard-one.vercel.app',
     'https://ara-dashboard-princezdavidz-6985.vercel.app',
+    'https://ara-public-website.onrender.com',
     ...(process.env.DASHBOARD_ORIGIN || '').split(',').map((origin) => origin.trim()).filter(Boolean),
     ...(process.env.ARA_CRM_ORIGIN || '').split(',').map((origin) => origin.trim()).filter(Boolean),
     ...(process.env.ARA_ADMIN_ORIGIN || '').split(',').map((origin) => origin.trim()).filter(Boolean),

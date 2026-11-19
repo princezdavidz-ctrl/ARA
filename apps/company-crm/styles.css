@@ -213,3 +213,24 @@ button:not(.secondary):not(.danger){background:var(--brand);box-shadow:0 5px 14p
 .knowledge-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:13px;margin-bottom:24px}.knowledge-card{padding:17px;border:1px solid #e5ebf3;border-radius:14px;background:#fff}.knowledge-card-icon{display:grid;place-items:center;width:34px;height:34px;margin-bottom:12px;border-radius:10px;background:#e8f7ef;color:#14865c}.knowledge-card strong{font-size:13px;color:#24344c}.knowledge-card p{font-size:11px;color:#8190a4;line-height:1.5}.knowledge-card .pill{font-size:9px}
 .knowledge-form{padding:22px}.knowledge-form .field{margin:10px 0 15px}.knowledge-form input[type=file]{background:#f7fafc;padding:11px}.knowledge-form textarea{min-height:110px;line-height:1.6}.knowledge-guidance{padding:14px 16px;margin:12px 0 17px;border-radius:12px;background:#f2f8ff;border:1px solid #e1ebf8}.knowledge-guidance strong{font-size:12px;color:#36547c}.knowledge-guidance p{margin:5px 0 0;font-size:11px;color:#70839e;line-height:1.6}.knowledge-topic-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}.knowledge-topic-list>div{padding:13px;border:1px solid #e7edf4;border-radius:11px;background:#fff}.knowledge-topic-list strong,.knowledge-topic-list small{display:block}.knowledge-topic-list strong{font-size:11px;color:#33445c}.knowledge-topic-list small{margin-top:4px;font-size:10px;line-height:1.5;color:#8995a7}
 @media(max-width:680px){.integration-intro{padding:19px;align-items:flex-start}.integration-icons{max-width:90px}.integration-icons span{width:34px;height:34px}.channel-provider-grid{grid-template-columns:1fr}.channel-setup,.knowledge-form{padding:15px}.channel-submit{align-items:flex-start;flex-direction:column}.knowledge-orb{flex-basis:48px;height:48px}}
+
+/* Tenant-scoped company AI assistant */
+.company-ai-assistant{position:fixed;right:22px;bottom:22px;z-index:90;font-family:'DM Sans',Inter,sans-serif}
+.company-ai-launcher{border:0;border-radius:999px;padding:14px 19px;background:linear-gradient(135deg,#10b981,#087b67);color:#06251b;font-size:12px;font-weight:800;box-shadow:0 12px 32px rgba(16,185,129,.28)}
+.company-ai-panel{position:absolute;right:0;bottom:66px;display:flex;flex-direction:column;width:min(390px,calc(100vw - 28px));height:min(590px,calc(100dvh - 110px));overflow:hidden;border:1px solid #dfe7f1;border-radius:18px;background:#fff;box-shadow:0 24px 70px rgba(18,35,62,.24)}
+.company-ai-panel[hidden],.company-ai-launcher[hidden]{display:none}
+.company-ai-panel>header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 16px;background:#14213a;color:#fff}
+.company-ai-panel>header div{display:grid;gap:4px}.company-ai-panel>header strong{font-family:Manrope,sans-serif;font-size:13px}.company-ai-panel>header small{font-size:10px;color:#aabbd3}
+.company-ai-panel>header button{padding:5px 9px;font-size:18px}
+.company-ai-messages{display:flex;flex:1;flex-direction:column;gap:9px;overflow:auto;padding:14px;background:#f7f9fc}
+.company-ai-bubble{max-width:88%;padding:11px 13px;border-radius:13px;font-size:12px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+.company-ai-bubble.assistant{align-self:flex-start;background:#fff;border:1px solid #e6ebf2;color:#263650;border-bottom-left-radius:4px}
+.company-ai-bubble.user{align-self:flex-end;background:#e4f7ef;color:#145c40;border:1px solid #cceedd;border-bottom-right-radius:4px}
+.company-ai-meta{align-self:flex-start;max-width:88%;font-size:9px;line-height:1.5;color:#8b97a9}
+.company-ai-panel form{display:flex;gap:8px;padding:12px;border-top:1px solid #edf0f5}
+.company-ai-panel form input{min-width:0;flex:1;border:1px solid #dfe6f0;border-radius:10px;padding:11px 12px;font-size:12px;outline:none}
+.company-ai-panel form input:focus{border-color:#10a477;box-shadow:0 0 0 3px rgba(16,164,119,.1)}
+.company-ai-panel form button{padding:10px 13px;font-size:11px}
+.company-ai-note{margin:0;padding:0 12px 11px;text-align:center;color:#8995a8;font-size:9px;line-height:1.5}
+#open-company-ai{margin-top:8px}
+@media(max-width:650px){.company-ai-assistant{right:13px;bottom:13px}.company-ai-panel{right:-2px;bottom:62px;height:min(590px,calc(100dvh - 96px))}.company-ai-launcher{padding:13px 16px}}
