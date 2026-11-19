@@ -10,7 +10,7 @@ async function main() {
     await client.query('BEGIN');
     await client.query("SELECT pg_advisory_xact_lock(hashtext('ara:migration:021_email_otp_auth'))");
     await client.query('CREATE TABLE IF NOT EXISTS ara_schema_migrations (name text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())');
-    for (const migrationName of ['021_email_otp_auth.sql', '022_company_branding.sql']) {
+    for (const migrationName of ['021_email_otp_auth.sql', '022_company_branding.sql', '023_supervised_message_approval.sql']) {
       const applied = await client.query('SELECT 1 FROM ara_schema_migrations WHERE name=$1', [migrationName]);
       if (!applied.rowCount) {
         const sql = fs.readFileSync(path.join(__dirname, '..', 'migrations', migrationName), 'utf8');
