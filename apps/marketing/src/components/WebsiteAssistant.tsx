@@ -20,7 +20,7 @@ export default function WebsiteAssistant() {
   useEffect(()=>{
     if(!support)return;
     let active=true;
-    const poll=async()=>{try{const response=await fetch(`${API_BASE}/public/support/requests/${support.id}/messages?token=${encodeURIComponent(support.visitorToken)}`);if(!response.ok)return;const data=await response.json();if(active){setSupportMessages(data.messages||[]);setSupport(s=>s?{...s,status:data.status}:s);if(data.status==='resolved')setSupportStatus(text.closed);}}catch{}};
+    const poll=async()=>{try{const response=await fetch(`${API_BASE}/public/support/requests/${support.id}/messages`,{headers:{'X-Support-Token':support.visitorToken}});if(!response.ok)return;const data=await response.json();if(active){setSupportMessages(data.messages||[]);setSupport(s=>s?{...s,status:data.status}:s);if(data.status==='resolved')setSupportStatus(text.closed);}}catch{}};
     poll();const timer=window.setInterval(poll,4000);return()=>{active=false;window.clearInterval(timer);};
   },[support?.id,support?.visitorToken]);
   function chooseLanguage(next:Language){setLanguage(next);setMessages([{role:'assistant',text:copy[next].greeting}]);}
