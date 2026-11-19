@@ -22,6 +22,8 @@ export class PlatformController {
   @UseGuards(AuthGuard) @Get('conversations') conversations(@Req() req:{user:AraUser}){return this.platform.conversations(req.user);}
   @UseGuards(AuthGuard) @Get('conversations/:id/messages') messages(@Req() req:{user:AraUser},@Param('id') id:string){return this.platform.messages(req.user,id);}
   @UseGuards(AuthGuard) @Post('conversations/:id/messages') addMessage(@Req() req:{user:AraUser},@Param('id') id:string,@Body() body:unknown){return this.platform.addMessage(req.user,id,body);}
+  @UseGuards(AuthGuard) @Get('conversations/:id/insights') conversationInsights(@Req() req:{user:AraUser},@Param('id') id:string){return this.platform.conversationInsights(req.user,id);}
+  @UseGuards(AuthGuard) @Post('conversations/:id/insights') generateConversationInsights(@Req() req:{user:AraUser},@Param('id') id:string){return this.platform.generateConversationInsights(req.user,id);}
   @UseGuards(AuthGuard) @Post('conversations/:id/assign') assign(@Req() req:{user:AraUser},@Param('id') id:string,@Body() body:unknown){return this.platform.assign(req.user,id,body);}
   @UseGuards(AuthGuard) @Get('approvals') approvals(@Req() req:{user:AraUser}){return this.platform.pendingApprovals(req.user);}
   @UseGuards(AuthGuard) @Post('messages/:id/approve') approveAiMessage(@Req() req:{user:AraUser},@Param('id') id:string){return this.platform.approveAiMessage(req.user,id);}
