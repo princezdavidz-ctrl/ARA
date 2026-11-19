@@ -21,6 +21,9 @@ export class PlatformController {
   @UseGuards(AuthGuard) @Get('conversations/:id/messages') messages(@Req() req:{user:AraUser},@Param('id') id:string){return this.platform.messages(req.user,id);}
   @UseGuards(AuthGuard) @Post('conversations/:id/messages') addMessage(@Req() req:{user:AraUser},@Param('id') id:string,@Body() body:unknown){return this.platform.addMessage(req.user,id,body);}
   @UseGuards(AuthGuard) @Post('conversations/:id/assign') assign(@Req() req:{user:AraUser},@Param('id') id:string,@Body() body:unknown){return this.platform.assign(req.user,id,body);}
+  @UseGuards(AuthGuard) @Get('approvals') approvals(@Req() req:{user:AraUser}){return this.platform.pendingApprovals(req.user);}
+  @UseGuards(AuthGuard) @Post('messages/:id/approve') approveAiMessage(@Req() req:{user:AraUser},@Param('id') id:string){return this.platform.approveAiMessage(req.user,id);}
+  @UseGuards(AuthGuard) @Post('messages/:id/reject') rejectAiMessage(@Req() req:{user:AraUser},@Param('id') id:string){return this.platform.rejectAiMessage(req.user,id);}
   @UseGuards(AuthGuard) @Get('escalations') escalations(@Req() req:{user:AraUser}){return this.platform.escalations(req.user);}
   @UseGuards(AuthGuard) @Post('conversations/:id/escalations') createEscalation(@Req() req:{user:AraUser},@Param('id') id:string,@Body() body:unknown){return this.platform.createEscalation(req.user,id,body);}
   @UseGuards(AuthGuard) @Post('escalations/:id/claim') claim(@Req() req:{user:AraUser},@Param('id') id:string){return this.platform.claimEscalation(req.user,id);}
