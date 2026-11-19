@@ -6,6 +6,7 @@ import { ConfigService } from '../config/config.service';
 import { DatabaseService } from '../database/database.service';
 import { OpenAiService } from '../llm/openai.service';
 import { AiOrchestratorService } from '../llm/ai-orchestrator.service';
+import { LocalLlmService } from '../llm/local-llm.service';
 import { LeadController } from './lead.controller';
 import { LeadService } from './lead.service';
 import { PlatformAdminController } from './platform-admin.controller';
@@ -25,5 +26,5 @@ import { SubscriptionLimitsService } from './subscription-limits.service';
 import { EmailOtpService } from './email-otp.service';
 import { SupportService } from './support.service';
 import { PublicSupportController } from '../http/public-support.controller';
-@Module({ controllers: [PlatformController, LeadController, PlatformAdminController, ChannelConnectionsController, BillingController, AdminIntegrationsController, AiUsageController, PublicSupportController], providers: [PlatformService, LeadService, PlatformAdminService, ChannelConnectionsService, ChannelCredentialVault, BillingService, MpesaService, AdminIntegrationsService, AiUsageService, SubscriptionLimitsService, EmailOtpService, SupportService, AuthGuard, PlatformAdminGuard, ConfigService, DatabaseService, OpenAiService, AiOrchestratorService], exports: [AuthGuard, ChannelCredentialVault, BillingService] })
+@Module({ controllers: [PlatformController, LeadController, PlatformAdminController, ChannelConnectionsController, BillingController, AdminIntegrationsController, AiUsageController, PublicSupportController], providers: [PlatformService, LeadService, PlatformAdminService, ChannelConnectionsService, ChannelCredentialVault, BillingService, MpesaService, AdminIntegrationsService, AiUsageService, SubscriptionLimitsService, EmailOtpService, SupportService, AuthGuard, PlatformAdminGuard, ConfigService, DatabaseService, OpenAiService, AiOrchestratorService, LocalLlmService], exports: [AuthGuard, ChannelCredentialVault, BillingService] })
 export class PlatformModule {}
