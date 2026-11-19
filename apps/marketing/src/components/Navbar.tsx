@@ -48,12 +48,12 @@ export default function Navbar() {
         </div>
 
         <div className="hidden items-center gap-3 md:flex">
-          <a href="https://ara-staff-console.onrender.com" className="text-xs font-medium text-ink-400 transition-colors hover:text-white">Staff Console</a>
+          
           <a
             href="https://ara-company-crm.onrender.com/?mode=login"
             className="text-sm font-medium text-ink-200 transition-colors hover:text-white"
           >
-            Sign in
+            Customer Login
           </a>
           <a
             href="https://ara-company-crm.onrender.com/?mode=register"
@@ -85,11 +85,17 @@ export default function Navbar() {
                 {l.label}
               </a>
             ))}
-            <a href="https://ara-staff-console.onrender.com" onClick={() => setOpen(false)} className="rounded-lg px-3 py-2.5 text-base font-medium text-ink-400 hover:bg-white/10 hover:text-white">Staff Console</a>
+            <a
+              href="https://ara-company-crm.onrender.com/?mode=login"
+              onClick={() => setOpen(false)}
+              className="mt-2 rounded-full border border-white/20 px-4 py-2.5 text-center text-sm font-semibold text-white"
+            >
+              Customer Login
+            </a>
             <a
               href="https://ara-company-crm.onrender.com/?mode=register"
               onClick={() => setOpen(false)}
-              className="mt-2 rounded-full bg-white px-4 py-2.5 text-center text-sm font-semibold text-ink-950"
+              className="rounded-full bg-white px-4 py-2.5 text-center text-sm font-semibold text-ink-950"
             >
               Start free
             </a>
