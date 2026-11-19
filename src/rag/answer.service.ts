@@ -138,7 +138,7 @@ Reply in the customer's requested language. If preferredLanguage is auto, use ${
       }
       if(data.status==='answered')await this.quota.consume(agencyId,quotaKey);
       else await this.quota.release(agencyId,quotaKey);
-      return data;
+      return {...data,responseMode};
     }catch{
       try{await this.quota.release(agencyId,quotaKey);}catch(error){
         this.logger.warn('AI quota reservation release failed: '+(error instanceof Error?error.name:'UnknownError'));
