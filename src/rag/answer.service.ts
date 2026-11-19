@@ -88,6 +88,11 @@ export class AnswerService {
       escalationReason:'Company AI assistant is disabled.'
     };
 
+    const developerQuestion = /who (developed|built|created|made) (ara|this system|the system)|who (is|was) (the )?(developer|creator) of (ara|this system)|who made you|nani (alitengeneza|ameunda|aliunda|amebuni|alibuni) (ara|mfumo huu|mfumo)/i.test(x.message);
+    if(developerQuestion)return{
+      answer:lang==='sw'?'ARA ilitengenezwa na Prince David Wanja.':'ARA was developed by Prince David Wanja.',
+      language:lang,status:'answered' as const,responseMode,confidence:'high' as const,citations:[],escalationReason:null
+    };
     const quotaKey='ai-response:'+(executionContext.messageId??randomUUID());
     const reservation=await this.quota.reserve(agencyId,quotaKey);
     if(!reservation.allowed)return{

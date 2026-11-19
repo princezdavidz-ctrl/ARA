@@ -6,13 +6,17 @@
 @layer utilities{.grid-bg{background-image:linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px);background-size:56px 56px}.radial-fade{-webkit-mask-image:radial-gradient(ellipse 70% 60% at 50% 0%,#000 40%,transparent 100%);mask-image:radial-gradient(ellipse 70% 60% at 50% 0%,#000 40%,transparent 100%)}}
 /* Floating public website assistant */
 .website-assistant{position:fixed;right:22px;bottom:22px;z-index:80;font-family:Inter,system-ui,sans-serif}
-.website-assistant-launcher{display:flex;align-items:center;gap:9px;border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:14px 19px;background:linear-gradient(135deg,#10b981,#0e8f72);color:#041610;font-weight:800;box-shadow:0 12px 36px rgba(16,185,129,.3);cursor:pointer}
+.website-assistant-launcher{display:flex;align-items:center;gap:9px;border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:14px 19px;background:linear-gradient(135deg,#10b981,#0e8f72);color:#041610;font-weight:800;box-shadow:0 12px 36px rgba(16,185,132,.3);cursor:pointer}
 .website-assistant-launcher:hover{transform:translateY(-2px)}
 .website-assistant-panel{position:absolute;right:0;bottom:68px;display:flex;flex-direction:column;width:min(380px,calc(100vw - 28px));height:min(560px,calc(100dvh - 120px));overflow:hidden;border:1px solid rgba(255,255,255,.14);border-radius:20px;background:#0d1725;box-shadow:0 24px 80px rgba(0,0,0,.48)}
 .website-assistant-header{display:flex;align-items:center;gap:11px;padding:15px 16px;border-bottom:1px solid rgba(255,255,255,.1);color:#fff}
 .website-assistant-avatar{display:grid;place-items:center;width:38px;height:38px;border-radius:13px;background:rgba(16,185,129,.16);color:#34d399}
 .website-assistant-header span:nth-child(2){display:grid;gap:3px;flex:1}.website-assistant-header strong{font-size:13px}.website-assistant-header small{font-size:10px;color:#91a3b9}
 .website-assistant-header button{display:grid;place-items:center;padding:7px;border:0;background:transparent;color:#a9b7c9;cursor:pointer}
+.website-assistant-language{display:flex;flex:1;flex-direction:column;justify-content:center;gap:12px;padding:26px;color:#e5edf7;text-align:center}
+.website-assistant-language strong{font-size:16px}.website-assistant-language p{margin:0 0 8px;color:#91a3b9;font-size:12px}
+.website-assistant-language button{border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:13px;background:#14263a;color:#fff;font-size:13px;font-weight:700;cursor:pointer}
+.website-assistant-language button:hover{border-color:#10b981;background:#12352e}
 .website-assistant-messages{display:flex;flex:1;flex-direction:column;gap:10px;overflow:auto;padding:15px}
 .website-assistant-message{max-width:88%;padding:11px 13px;border-radius:14px;font-size:12px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere}
 .website-assistant-message.assistant{align-self:flex-start;border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.07);color:#e5edf7;border-bottom-left-radius:5px}
@@ -21,5 +25,6 @@
 .website-assistant-form{display:flex;gap:8px;padding:12px;border-top:1px solid rgba(255,255,255,.1)}
 .website-assistant-form input{min-width:0;flex:1;border:1px solid rgba(255,255,255,.14);border-radius:12px;background:#111f30;padding:11px 12px;color:#fff;font-size:12px;outline:none}
 .website-assistant-form input:focus{border-color:#10b981}.website-assistant-form button{display:grid;place-items:center;width:42px;border:0;border-radius:12px;background:#10b981;color:#05251a;cursor:pointer}.website-assistant-form button:disabled{opacity:.45;cursor:not-allowed}
-.website-assistant-note{margin:0;padding:0 13px 11px;color:#7f91a7;font-size:9px;text-align:center}
+.website-assistant-note{margin:0;padding:0 13px 7px;color:#7f91a7;font-size:9px;text-align:center}
+.website-assistant-change-language{align-self:center;margin:0 0 10px;border:0;background:transparent;color:#72dcb5;font-size:10px;cursor:pointer}
 @media(max-width:480px){.website-assistant{right:14px;bottom:14px}.website-assistant-panel{right:-2px;bottom:64px;height:min(560px,calc(100dvh - 100px))}.website-assistant-launcher{padding:13px 16px}}
