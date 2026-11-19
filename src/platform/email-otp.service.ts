@@ -25,7 +25,8 @@ export class EmailOtpService {
     const smtpUser = this.config.get('SMTP_USER');
     const smtpPass = this.config.get('SMTP_PASS');
     const from = this.config.get('ARA_AUTH_EMAIL_FROM') || smtpUser;
-    if (resendApiKey ? !from : (!smtpHost || !smtpPort || !smtpUser || !smtpPass || !from)) {
+    const testOtpEnabled = process.env.ARA_ENVIRONMENT === 'staging' && process.env.ARA_TEST_OTP_ENABLED === 'true';
+    if (!testOtpEnabled && (resendApiKey ? !from : (!smtpHost || !smtpPort || !smtpUser || !smtpPass || !from))) {
       throw new ServiceUnavailableException('Configure Resend HTTPS email (RESEND_API_KEY and ARA_AUTH_EMAIL_FROM) or a supported SMTP provider.');
     }
 
@@ -35,7 +36,8 @@ export class EmailOtpService {
     );
     if (recent.rowCount) throw new HttpException('Please wait 60 seconds before requesting another code.', 429);
 
-    const code = String(randomInt(0, 1000000)).padStart(6, '0');
+    // Fixed OTP is permitted only in explicitly marked staging environments.
+    const code = testOtpEnabled ? '127457' : String(randomInt(0, 1000000)).padStart(6, '0');
     const challengeId = randomUUID();
     await this.db.query(
       'UPDATE auth_email_otps SET consumed_at=now() WHERE lower(email)=lower($1) AND purpose=$2 AND consumed_at IS NULL',
@@ -48,6 +50,7 @@ export class EmailOtpService {
 
     let transporter: any;
     try {
+      if (!testOtpEnabled) {
       const subject = 'Your ARA verification code';
       const messageText = 'Your ARA verification code is ' + code + '. It expires in 5 minutes. If you did not request this code, you can ignore this email.';
       const messageHtml = '<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:32px;color:#172033"><h2>Verify your ARA sign-in</h2><p>Enter this one-time code to continue:</p><div style="font-size:32px;font-weight:700;letter-spacing:8px;padding:18px;background:#f2f5fa;border-radius:12px;text-align:center">' + code + '</div><p>This code expires in 5 minutes and can only be used once.</p><p>If you did not request this code, ignore this email.</p></div>';
@@ -78,6 +81,7 @@ export class EmailOtpService {
         });
         await transporter.sendMail({ from: { name: 'ARA', address: from }, to: email, subject, text: messageText, html: messageHtml });
       }
+      }
     } catch (error: any) {
       await this.db.query('UPDATE auth_email_otps SET consumed_at=now() WHERE id=$1', [challengeId]);
       const diagnostic = {
@@ -100,7 +104,7 @@ export class EmailOtpService {
       transporter?.close();
     }
 
-    return { requiresOtp: true, challengeId, email, expiresIn: 300, resendAfter: 60, message: 'A six-digit verification code has been sent to your email.' };
+    return { requiresOtp: true, challengeId, email, expiresIn: 300, resendAfter: 60, message: testOtpEnabled ? 'Staging test code is 127457. This code is not available in production.' : 'A six-digit verification code has been sent to your email.' };
   }
 
   async resend(challengeIdValue: string, purpose: OtpPurpose) {
