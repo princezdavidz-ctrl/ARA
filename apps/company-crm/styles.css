@@ -309,3 +309,12 @@ button:not(.secondary):not(.danger){background:var(--brand);box-shadow:0 5px 14p
 @media(max-width:1000px){.register-page{grid-template-columns:minmax(270px,.72fr) minmax(480px,1.28fr)}.register-aside{padding:34px 30px}.register-main{padding-inline:25px}}
 @media(max-width:760px){.register-page{display:block}.register-aside{display:none}.register-main{min-height:100vh;padding:20px 14px 16px;background:radial-gradient(circle at 90% 0%,rgba(16,185,129,.08),transparent 30%),#f5f7fb}.register-mobile-brand{display:flex;align-items:center;gap:9px;width:min(100%,650px);margin:0 auto 15px;color:#0f263b;font-size:21px}.register-mobile-brand:first-letter{color:#10b981}.register-card{padding:22px 18px;border-radius:17px}.register-heading h2{font-size:25px}.register-progress{margin:22px 0}.register-footer{padding-bottom:8px}}
 @media(max-width:420px){.register-progress-step{gap:6px}.register-progress-step small{font-size:9px}.register-progress-step span{width:27px;height:27px}.register-progress{gap:7px}.register-colour-heading{align-items:flex-start;flex-direction:column;gap:3px}.register-logo-row{grid-template-columns:minmax(0,1fr) 52px}.register-logo-row .brand-logo-preview{width:52px;height:52px}}
+
+/* Four-step company registration form controls */
+.register-card .field select{display:block;width:100%;min-height:45px;margin-top:7px;padding:11px 13px;border:1px solid #dfe6ee;border-radius:10px;background:#fbfcfe;color:#17243b;font-size:12px;outline:none}
+.register-card .field select:focus{border-color:#18b98a;box-shadow:0 0 0 3px rgba(16,185,129,.1)}
+.register-progress{gap:7px}
+.register-progress-step{gap:6px}
+.register-progress-step span{width:27px;height:27px}
+.register-progress-step small{font-size:9px}
+@media(max-width:520px){.register-progress{gap:4px}.register-progress-step{gap:4px}.register-progress-step small{font-size:8px}.register-progress-step span{width:24px;height:24px;font-size:10px}}

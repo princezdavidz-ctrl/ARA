@@ -30,19 +30,28 @@ export class PlatformService implements OnApplicationBootstrap {
   private async audit(agencyId:string,actor:string|null,action:string,type:string,id:string|null,details:Record<string,unknown>={}){await this.db.query('INSERT INTO audit_logs(agency_id,actor_user_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5,$6)',[agencyId,actor,action,type,id,JSON.stringify(details)]);}
   async register(body:any){
     const name=String(body?.agencyName||'').trim(),fullName=String(body?.fullName||'').trim(),email=String(body?.email||'').trim().toLowerCase(),password=String(body?.password||'');
+    const businessType=String(body?.businessType||'other').trim().toLowerCase(),industry=String(body?.industry||'general').trim().toLowerCase();
+    const website=String(body?.website||'').trim(),registrationNumber=String(body?.registrationNumber||'').trim();
+    const companyEmail=String(body?.companyEmail||'').trim().toLowerCase(),companyPhone=String(body?.companyPhone||'').trim();
+    const country=String(body?.country||'').trim(),region=String(body?.region||'').trim(),city=String(body?.city||'').trim(),physicalAddress=String(body?.physicalAddress||'').trim();
+    const timezone=String(body?.timezone||'Africa/Nairobi').trim(),tagline=String(body?.tagline||'').trim();
     const primaryColor=String(body?.primaryColor||'#10B981').toUpperCase(),accentColor=String(body?.accentColor||'#0F172A').toUpperCase(),logoDataUrl=String(body?.logoDataUrl||'');
     if(name.length<2||name.length>120||fullName.length<2||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||password.length<12)throw new BadRequestException('Provide a company name (2–120 characters), full name, valid email and password (minimum 12 characters).');
+    if(!/^[a-z0-9_]{2,40}$/.test(industry)||businessType.length>40)throw new BadRequestException('Select a valid business type and industry.');
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(companyEmail)||companyPhone.length<7||country.length<2||city.length<2)throw new BadRequestException('Provide a valid company email, phone number, country and city.');
+    if(website){try{const parsed=new URL(website);if(!['http:','https:'].includes(parsed.protocol))throw new Error('invalid');}catch{throw new BadRequestException('Company website must be a valid http or https URL.');}}
     if(!/^#[0-9A-F]{6}$/.test(primaryColor)||!/^#[0-9A-F]{6}$/.test(accentColor))throw new BadRequestException('Brand colours must be valid six-digit hex colours.');
     if(logoDataUrl && (logoDataUrl.length>1400000 || !/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(logoDataUrl)))throw new BadRequestException('Company logo must be a PNG, JPEG or WebP image smaller than 1 MB.');
+    if(tagline.length>160||registrationNumber.length>100||website.length>255||companyPhone.length>32||country.length>80||region.length>100||city.length>100||physicalAddress.length>255)throw new BadRequestException('One or more company details exceed the allowed length.');
 
     const slug=this.slug(name)+'-'+randomBytes(3).toString('hex'),hash=await this.hashPassword(password);
     let createdAgencyId:string|undefined;
     try{
       const created=await this.db.transaction(async c=>{
         const a=await c.query('INSERT INTO agencies(name,slug) VALUES($1,$2) RETURNING id,name,slug',[name,slug]);
-        await c.query('INSERT INTO company_settings(agency_id,industry,display_name,logo_data_url,brand_primary_color,brand_accent_color) VALUES($1,$2,$3,$4,$5,$6)',[a.rows[0].id,'general',name,logoDataUrl||null,primaryColor,accentColor]);
+        await c.query('INSERT INTO company_settings(agency_id,industry,display_name,logo_data_url,brand_primary_color,brand_accent_color,business_type,website,registration_number,contact_email,contact_phone,country,region,city,physical_address,timezone,tagline) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)',[a.rows[0].id,industry,name,logoDataUrl||null,primaryColor,accentColor,businessType,website||null,registrationNumber||null,companyEmail,companyPhone,country,region||null,city,physicalAddress||null,timezone,tagline||null]);
         await c.query("INSERT INTO company_ai_settings(agency_id,response_mode) VALUES($1,'supervised')",[a.rows[0].id]);
-        await c.query("INSERT INTO knowledge_bases(agency_id,name,industry,is_default) VALUES($1,'Company Knowledge','general',true)",[a.rows[0].id]);
+        await c.query("INSERT INTO knowledge_bases(agency_id,name,industry,is_default) VALUES($1,'Company Knowledge',$2,true)",[a.rows[0].id,industry]);
         const u=await c.query('INSERT INTO agency_users(agency_id,email,full_name,password_hash,role) VALUES($1,$2,$3,$4,\'owner\') RETURNING id,agency_id AS "agencyId",email,full_name AS "fullName",role',[a.rows[0].id,email,fullName,hash]);
         const user=u.rows[0];
         createdAgencyId=a.rows[0].id;
@@ -67,7 +76,6 @@ export class PlatformService implements OnApplicationBootstrap {
       throw e;
     }
   }
-
 
   async brandProfile(u:User){
     const r=await this.db.query('SELECT a.name AS "companyName",cs.display_name AS "displayName",cs.logo_data_url AS "logoDataUrl",cs.brand_primary_color AS "primaryColor",cs.brand_accent_color AS "accentColor" FROM agencies a LEFT JOIN company_settings cs ON cs.agency_id=a.id WHERE a.id=$1 AND a.is_active=true',[u.agencyId]);
