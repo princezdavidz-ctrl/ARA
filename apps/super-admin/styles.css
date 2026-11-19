@@ -184,3 +184,25 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   .stat{padding:15px}
   .stat strong{font-size:25px}
 }
+
+
+/* Full-page form surfaces and semantic fieldsets */
+.login-wrap{min-height:100vh;grid-template-columns:minmax(0,1.05fr) minmax(480px,.95fr);place-items:stretch;gap:0;padding:0}
+.login{width:100%;max-width:none;min-height:100vh;display:flex;flex-direction:column;justify-content:center;border:0;border-left:1px solid var(--admin-line);border-radius:0;box-shadow:none;padding:clamp(28px,5vw,76px);background:#fff}
+.form-fieldset{min-width:0;width:100%;margin:14px 0 18px;padding:20px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 18px;border:1px solid #dce8e4;border-radius:15px;background:#fbfdfc}
+.form-fieldset legend{padding:0 10px;color:#087a5b;font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase}
+.form-fieldset .field{min-width:0}
+.form-grid>.form-fieldset{grid-column:1/-1}
+.form-fieldset .wide{grid-column:1/-1}
+.form-grid>.wide{grid-column:1/-1}
+.login .form-fieldset{grid-template-columns:1fr;margin:16px 0 10px}
+.login .form-fieldset .field{margin:10px 0}
+@media(max-width:900px){
+ .login-wrap{grid-template-columns:1fr}
+ .login-visual{min-height:34vh;padding:28px}
+ .login{min-height:66vh;border-left:0;border-top:1px solid var(--admin-line);padding:clamp(24px,6vw,48px)}
+}
+@media(max-width:560px){
+ .form-fieldset{grid-template-columns:1fr;padding:15px}
+ .form-fieldset .wide{grid-column:auto}
+}
