@@ -223,6 +223,14 @@ button:not(.secondary):not(.danger){background:var(--brand);box-shadow:0 5px 14p
 .company-ai-panel>header div{display:grid;gap:4px}.company-ai-panel>header strong{font-family:Manrope,sans-serif;font-size:13px}.company-ai-panel>header small{font-size:10px;color:#aabbd3}
 .company-ai-panel>header button{padding:5px 9px;font-size:18px}
 .company-ai-messages{display:flex;flex:1;flex-direction:column;gap:9px;overflow:auto;padding:14px;background:#f7f9fc}
+.company-ai-language{display:flex;flex:1;flex-direction:column;justify-content:center;gap:12px;padding:24px;background:#f7f9fc;text-align:center}
+.company-ai-language strong{font:800 15px Manrope,sans-serif;color:#21334a}
+.company-ai-language p{margin:0 0 8px;color:#7c8ba0;font-size:11px}
+.company-ai-language button{border:1px solid #dfe7ef;border-radius:11px;padding:12px;background:#fff;color:#21334a;font-size:12px;font-weight:800;cursor:pointer}
+.company-ai-language button:hover{border-color:#10b981;background:#effbf6}
+.company-ai-language[hidden],.company-ai-messages[hidden],.company-ai-panel form[hidden],.company-ai-change-language[hidden]{display:none}
+.company-ai-change-language{align-self:center;margin:0 0 10px;border:0;background:transparent;color:#07865f;font-size:10px;font-weight:700;cursor:pointer}
+
 .company-ai-bubble{max-width:88%;padding:11px 13px;border-radius:13px;font-size:12px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
 .company-ai-bubble.assistant{align-self:flex-start;background:#fff;border:1px solid #e6ebf2;color:#263650;border-bottom-left-radius:4px}
 .company-ai-bubble.user{align-self:flex-end;background:#e4f7ef;color:#145c40;border:1px solid #cceedd;border-bottom-right-radius:4px}
