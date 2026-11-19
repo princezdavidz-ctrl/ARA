@@ -193,6 +193,43 @@ export class BillingService {
     return {items,tenantCount:items.length,generatedAt:new Date().toISOString()};
   }
 
+
+  async listTenantPlans(user:AraUser){
+    this.requireBillingManager(user);
+    const result=await this.db.query('SELECT id,code,name,description,currency,monthly_price_minor AS "monthlyPriceMinor",included_messages AS "includedMessages",included_ai_responses AS "includedAiResponses",max_channels AS "maxChannels",max_seats AS "maxSeats" FROM subscription_plans WHERE is_active=true ORDER BY monthly_price_minor,code');
+    return {items:result.rows};
+  }
+
+  async purchasePlan(user:AraUser,planId:string,body:any){
+    this.requireBillingManager(user);this.uuid(planId);
+    const interval=String(body?.billingInterval||'month');
+    if(!['month','year'].includes(interval))throw new BadRequestException('billingInterval must be month or year');
+    return this.db.transaction(async client=>{
+      const agency=await client.query('SELECT id FROM agencies WHERE id=$1 FOR UPDATE',[user.agencyId]);
+      if(!agency.rowCount)throw new NotFoundException('Company not found');
+      const plan=await client.query<any>('SELECT * FROM subscription_plans WHERE id=$1 AND is_active=true',[planId]);
+      if(!plan.rowCount)throw new NotFoundException('Active subscription plan not found');
+      const p=plan.rows[0];
+      if(p.currency!=='KES')throw new BadRequestException('M-Pesa checkout currently supports KES plans only');
+      const total=BigInt(p.monthly_price_minor)*(interval==='year'?12n:1n);
+      if(total<=0n||total%100n!==0n)throw new BadRequestException('The selected plan must have a positive price in whole KES to use M-Pesa');
+      const pending=await client.query("SELECT i.id FROM billing_invoices i JOIN company_subscriptions cs ON cs.id=i.subscription_id WHERE i.agency_id=$1 AND i.status='open' AND cs.status='suspended' LIMIT 1",[user.agencyId]);
+      if(pending.rowCount)throw new ConflictException('You already have a subscription payment awaiting completion. Pay its invoice before choosing another plan.');
+      const start=new Date(),end=new Date(start);
+      if(interval==='year')end.setFullYear(end.getFullYear()+1);else end.setMonth(end.getMonth()+1);
+      const sub=await client.query<any>('INSERT INTO company_subscriptions(agency_id,plan_id,status,billing_interval,currency,unit_price_minor,current_period_start,current_period_end) VALUES($1,$2,\'suspended\',$3,$4,$5,$6,$7) RETURNING id,plan_id AS "planId",status,billing_interval AS "billingInterval",currency,unit_price_minor AS "unitPriceMinor",current_period_start AS "currentPeriodStart",current_period_end AS "currentPeriodEnd"',
+        [user.agencyId,planId,interval,p.currency,total.toString(),start.toISOString(),end.toISOString()]);
+      const invoiceNumber='ARA-'+start.toISOString().slice(0,10).replace(/-/g,'')+'-'+randomBytes(3).toString('hex').toUpperCase();
+      const invoice=await client.query<any>('INSERT INTO billing_invoices(agency_id,subscription_id,invoice_number,status,currency,subtotal_minor,tax_minor,total_minor,period_start,period_end,due_at) VALUES($1,$2,$3,\'open\',$4,$5,0,$5,$6,$7,now()+interval \'7 days\') RETURNING id,invoice_number AS "invoiceNumber",status,currency,total_minor AS "totalMinor",due_at AS "dueAt"',
+        [user.agencyId,sub.rows[0].id,invoiceNumber,p.currency,total.toString(),start.toISOString(),end.toISOString()]);
+      await client.query('INSERT INTO billing_invoice_items(agency_id,invoice_id,metric,description,quantity,unit_price_minor,amount_minor) VALUES($1,$2,\'subscription\',$3,1,$4,$4)',
+        [user.agencyId,invoice.rows[0].id,p.name+' subscription ('+interval+')',total.toString()]);
+      await client.query("INSERT INTO audit_logs(agency_id,actor_user_id,action,target_type,target_id,details) VALUES($1,$2,'billing.plan_purchase_started','billing_invoice',$3,$4::jsonb)",
+        [user.agencyId,user.id,invoice.rows[0].id,JSON.stringify({planId,planCode:p.code,billingInterval:interval,totalMinor:total.toString()})]);
+      return {subscription:sub.rows[0],invoice:invoice.rows[0],message:'Plan selected. Complete the M-Pesa payment to activate it.'};
+    });
+  }
+
   async tenantSummary(user:AraUser){
     this.requireBillingManager(user);
     await this.db.query("UPDATE company_subscriptions SET status='expired',updated_at=now() WHERE agency_id=$1 AND status IN ('trialing','active','past_due') AND current_period_end<=now()",[user.agencyId]);
