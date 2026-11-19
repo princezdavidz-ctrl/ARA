@@ -21,6 +21,7 @@ export class SupportService {
     return {...thread.rows[0],visitorToken:token,staffOnline:Boolean(online.rowCount),assigned:Boolean(online.rowCount)};
   }
   private async verifyVisitor(id:string,token:string){
+    token=String(token||'');
     if(!/^[0-9a-f-]{36}$/i.test(id)||token.length<32)throw new UnauthorizedException('Invalid support session');
     const row=await this.db.query('SELECT id FROM ara_support_threads WHERE id=$1 AND visitor_token_hash=$2',[id,this.hash(token)]);
     if(!row.rowCount)throw new UnauthorizedException('Invalid support session');
