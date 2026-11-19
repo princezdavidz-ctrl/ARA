@@ -19,6 +19,28 @@ export class MessageWorker implements OnModuleInit, OnModuleDestroy {
   private running = false;
 
   constructor(private readonly db: DatabaseService, private readonly answers: AnswerService, private readonly config: ConfigService, private readonly vault: ChannelCredentialVault, private readonly messageQuota: MessageUsageQuotaService) {}
+  private async createHumanEscalation(client:any,agencyId:string,conversationId:string,reason:string):Promise<void>{
+    const existing=await client.query("SELECT id,status FROM escalations WHERE agency_id=$1 AND conversation_id=$2 AND status IN ('open','claimed') ORDER BY created_at DESC LIMIT 1",[agencyId,conversationId]);
+    let escalationId:string;
+    let status:string;
+    if(existing.rowCount){escalationId=existing.rows[0].id;status=existing.rows[0].status;}
+    else{
+      const created=await client.query("INSERT INTO escalations(agency_id,conversation_id,reason) VALUES($1,$2,$3) RETURNING id,status",[agencyId,conversationId,reason]);
+      escalationId=created.rows[0].id;status=created.rows[0].status;
+    }
+    if(status!=='open')return;
+    const available=await client.query(`SELECT a.id FROM agency_users a
+      JOIN agency_user_presence p ON p.user_id=a.id AND p.agency_id=a.agency_id
+      WHERE a.agency_id=$1 AND a.is_active=true AND p.is_online=true AND p.last_seen_at>=now()-interval '90 seconds'
+      ORDER BY (SELECT count(*) FROM conversations c WHERE c.agency_id=a.agency_id AND c.assigned_user_id=a.id AND c.status IN ('open','pending')) ASC,
+      p.last_seen_at DESC LIMIT 1`,[agencyId]);
+    if(!available.rowCount)return;
+    const staffId=available.rows[0].id;
+    const claimed=await client.query("UPDATE escalations SET status='claimed',claimed_by=$3 WHERE id=$1 AND agency_id=$2 AND status='open' RETURNING id",[escalationId,agencyId,staffId]);
+    if(!claimed.rowCount)return;
+    await client.query("UPDATE conversations SET assigned_user_id=$3,status='pending',updated_at=now() WHERE id=$1 AND agency_id=$2",[conversationId,agencyId,staffId]);
+  }
+
   onModuleInit(): void { this.timer = setInterval(() => void this.tick(), 1500); void this.tick(); }
   onModuleDestroy(): void { if (this.timer) clearInterval(this.timer); }
 
@@ -63,7 +85,7 @@ export class MessageWorker implements OnModuleInit, OnModuleDestroy {
         await this.db.transaction(async client => {
           await client.query("UPDATE messages SET processing_status='completed',processing_started_at=NULL WHERE id=$1", [job.id]);
           await client.query("UPDATE conversations SET status='pending',updated_at=now() WHERE id=$1 AND agency_id=$2", [job.conversationId, job.agencyId]);
-          await client.query("INSERT INTO escalations(agency_id,conversation_id,reason) SELECT $1,$2,$3 WHERE NOT EXISTS(SELECT 1 FROM escalations WHERE agency_id=$1 AND conversation_id=$2 AND status IN ('open','claimed'))", [job.agencyId, job.conversationId, reservation.reason || 'Message allowance exhausted; human review required']);
+          await this.createHumanEscalation(client,job.agencyId,job.conversationId,reservation.reason||'Message allowance exhausted; human review required');
         });
         return;
       }
@@ -79,7 +101,7 @@ export class MessageWorker implements OnModuleInit, OnModuleDestroy {
         await client.query("UPDATE messages SET processing_status='completed',processing_started_at=NULL WHERE id=$1", [job.id]);
         await client.query("UPDATE conversations SET status=$3,updated_at=now() WHERE id=$1 AND agency_id=$2", [job.conversationId, job.agencyId, result.status === 'needs_human' ? 'pending' : 'open']);
         if (result.status === 'needs_human') {
-          await client.query("INSERT INTO escalations(agency_id,conversation_id,reason) SELECT $1,$2,$3 WHERE NOT EXISTS(SELECT 1 FROM escalations WHERE agency_id=$1 AND conversation_id=$2 AND status IN ('open','claimed'))", [job.agencyId, job.conversationId, result.escalationReason || 'AI requested human review']);
+          await this.createHumanEscalation(client,job.agencyId,job.conversationId,result.escalationReason||'AI requested human review');
         }
       });
     } catch (error) {
