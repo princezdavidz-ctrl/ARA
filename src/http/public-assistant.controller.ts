@@ -14,8 +14,7 @@ export class PublicAssistantController {
     const parsed = requestSchema.safeParse(body);
     if (!parsed.success) throw new HttpException('Please enter a message between 2 and 1,200 characters.', HttpStatus.BAD_REQUEST);
 
-    const forwarded = req.headers?.['x-forwarded-for'];
-    const ip = (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(',')[0]?.trim() || req.ip || 'unknown';
+    const ip = req.ip || 'unknown';
     const now = Date.now();
     const recent = (windows.get(ip) || []).filter((time) => now - time < 60_000);
     if (recent.length >= 8) throw new HttpException('Please wait a moment before asking another question.', HttpStatus.TOO_MANY_REQUESTS);
