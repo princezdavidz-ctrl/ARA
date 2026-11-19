@@ -9,6 +9,8 @@ export class PlatformAdminController {
  @Post('auth/login') login(@Body() body:unknown){return this.adminService.login(body);}
  @Post('auth/verify-otp') verifyOtp(@Body() body:unknown){return this.adminService.verifyLoginOtp(body);}
  @Post('auth/resend-otp') resendOtp(@Body() body:any){return this.adminService.resendLoginOtp(body);}
+ @UseGuards(PlatformAdminGuard) @Get('support/staff') supportStaff(@Req() req:{platformAdmin:PlatformAdmin}){return this.adminService.supportStaff(req.platformAdmin);}
+ @UseGuards(PlatformAdminGuard) @Post('support/staff') createSupportStaff(@Req() req:{platformAdmin:PlatformAdmin},@Body() body:unknown){return this.adminService.createSupportStaff(req.platformAdmin,body);}
  @UseGuards(PlatformAdminGuard) @Get('support/inbox') supportInbox(@Req() req:{platformAdmin:PlatformAdmin}){return this.support.inbox(req.platformAdmin);}
  @UseGuards(PlatformAdminGuard) @Get('support/threads/:id') supportThread(@Req() req:{platformAdmin:PlatformAdmin},@Param('id') id:string){return this.support.thread(req.platformAdmin,id);}
  @UseGuards(PlatformAdminGuard) @Post('support/threads/:id/claim') claimSupport(@Req() req:{platformAdmin:PlatformAdmin},@Param('id') id:string){return this.support.claim(req.platformAdmin,id);}
