@@ -148,6 +148,22 @@ export class PlatformService implements OnApplicationBootstrap {
   async logout(token:string){if(token)await this.db.query('UPDATE refresh_sessions SET revoked_at=now() WHERE token_hash=$1 AND revoked_at IS NULL',[createHash('sha256').update(token).digest('hex')]);return {success:true};}
   private requireRole(u:User,roles:string[]){if(!roles.includes(u.role))throw new ForbiddenException('Insufficient role');}
   async team(u:User){this.requireRole(u,['owner','admin','manager']);return (await this.db.query('SELECT id,email,full_name AS "fullName",role,is_active AS "isActive",created_at AS "createdAt" FROM agency_users WHERE agency_id=$1 ORDER BY created_at',[u.agencyId])).rows;}
+  async teamPresence(u:User){
+    return (await this.db.query(`SELECT a.id,a.full_name AS "fullName",a.role,
+      COALESCE(p.is_online AND p.last_seen_at>=now()-interval '90 seconds',false) AS "isOnline",
+      p.last_seen_at AS "lastSeenAt"
+      FROM agency_users a LEFT JOIN agency_user_presence p ON p.user_id=a.id AND p.agency_id=a.agency_id
+      WHERE a.agency_id=$1 AND a.is_active=true ORDER BY a.full_name`,[u.agencyId])).rows;
+  }
+  async updateTeamPresence(u:User,b:any){
+    if(typeof b?.isOnline!=='boolean')throw new BadRequestException('isOnline must be true or false');
+    const r=await this.db.query(`INSERT INTO agency_user_presence(user_id,agency_id,is_online,last_seen_at)
+      SELECT id,agency_id,$3,now() FROM agency_users WHERE id=$1 AND agency_id=$2 AND is_active=true
+      ON CONFLICT(user_id,agency_id) DO UPDATE SET is_online=EXCLUDED.is_online,last_seen_at=now()
+      RETURNING is_online AS "isOnline",last_seen_at AS "lastSeenAt"`,[u.id,u.agencyId,b.isOnline]);
+    if(!r.rowCount)throw new NotFoundException('Active team member not found');
+    return r.rows[0];
+  }
   async addMember(u:User,b:any){
     this.requireRole(u,['owner','admin']);
     const email=String(b?.email||'').trim().toLowerCase(),fullName=String(b?.fullName||'').trim(),password=String(b?.password||''),role=String(b?.role||'agent');
@@ -191,6 +207,13 @@ export class PlatformService implements OnApplicationBootstrap {
   async assign(u:User,id:string,b:any){this.requireRole(u,['owner','admin','manager']);const target=String(b?.userId||'');const r=await this.db.query('UPDATE conversations c SET assigned_user_id=$3,updated_at=now() WHERE c.id=$1 AND c.agency_id=$2 AND EXISTS(SELECT 1 FROM agency_users a WHERE a.id=$3 AND a.agency_id=$2 AND a.is_active=true) RETURNING c.*',[id,u.agencyId,target]);if(!r.rowCount)throw new NotFoundException('Conversation or active team member not found');return r.rows[0];}
   async escalations(u:User){return (await this.db.query('SELECT * FROM escalations WHERE agency_id=$1 AND status<>\'resolved\' ORDER BY created_at',[u.agencyId])).rows;}
   async createEscalation(u:User,id:string,b:any){const reason=String(b?.reason||'').trim();if(!reason)throw new BadRequestException('Escalation reason required');const r=await this.db.query('INSERT INTO escalations(agency_id,conversation_id,reason) SELECT $1,id,$3 FROM conversations WHERE id=$2 AND agency_id=$1 RETURNING *',[u.agencyId,id,reason]);if(!r.rowCount)throw new NotFoundException('Conversation not found');await this.db.query('UPDATE conversations SET status=\'pending\',updated_at=now() WHERE id=$1 AND agency_id=$2',[id,u.agencyId]);return r.rows[0];}
-  async claimEscalation(u:User,id:string){const r=await this.db.query('UPDATE escalations SET status=\'claimed\',claimed_by=$3 WHERE id=$1 AND agency_id=$2 AND status=\'open\' RETURNING *',[id,u.agencyId,u.id]);if(!r.rowCount)throw new NotFoundException('Open escalation not found');return r.rows[0];}
+  async claimEscalation(u:User,id:string){
+    return this.db.transaction(async client=>{
+      const r=await client.query("UPDATE escalations SET status='claimed',claimed_by=$3 WHERE id=$1 AND agency_id=$2 AND status='open' RETURNING *",[id,u.agencyId,u.id]);
+      if(!r.rowCount)throw new NotFoundException('Open escalation not found');
+      await client.query("UPDATE conversations SET assigned_user_id=$3,status='pending',updated_at=now() WHERE id=$1 AND agency_id=$2",[r.rows[0].conversation_id,u.agencyId,u.id]);
+      return r.rows[0];
+    });
+  }
   async resolveEscalation(u:User,id:string){const r=await this.db.query('UPDATE escalations SET status=\'resolved\',resolved_by=$3,resolved_at=now() WHERE id=$1 AND agency_id=$2 AND status IN (\'open\',\'claimed\') RETURNING *',[id,u.agencyId,u.id]);if(!r.rowCount)throw new NotFoundException('Unresolved escalation not found');return r.rows[0];}
 }

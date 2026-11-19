@@ -14,6 +14,8 @@ export class PlatformController {
   @Post('refresh') refresh(@Body() body:any){return this.platform.refresh(String(body?.refreshToken||''));}
   @Post('logout') logout(@Body() body:any){return this.platform.logout(String(body?.refreshToken||''));}
   @UseGuards(AuthGuard) @Get('team') team(@Req() req:{user:AraUser}){return this.platform.team(req.user);}
+  @UseGuards(AuthGuard) @Get('team/presence') teamPresence(@Req() req:{user:AraUser}){return this.platform.teamPresence(req.user);}
+  @UseGuards(AuthGuard) @Post('team/presence') updateTeamPresence(@Req() req:{user:AraUser},@Body() body:unknown){return this.platform.updateTeamPresence(req.user,body);}
   @UseGuards(AuthGuard) @Post('team') addMember(@Req() req:{user:AraUser},@Body() body:unknown){return this.platform.addMember(req.user,body);}
   @UseGuards(AuthGuard) @Post('team/:id/deactivate') deactivate(@Req() req:{user:AraUser},@Param('id') id:string){return this.platform.deactivate(req.user,id);}
   @UseGuards(AuthGuard) @Post('conversations') createConversation(@Req() req:{user:AraUser},@Body() body:unknown){return this.platform.createConversation(req.user,body);}
