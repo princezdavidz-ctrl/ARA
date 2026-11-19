@@ -148,6 +148,22 @@ export class PlatformService implements OnApplicationBootstrap {
   async logout(token:string){if(token)await this.db.query('UPDATE refresh_sessions SET revoked_at=now() WHERE token_hash=$1 AND revoked_at IS NULL',[createHash('sha256').update(token).digest('hex')]);return {success:true};}
   private requireRole(u:User,roles:string[]){if(!roles.includes(u.role))throw new ForbiddenException('Insufficient role');}
   async team(u:User){this.requireRole(u,['owner','admin','manager']);return (await this.db.query('SELECT id,email,full_name AS "fullName",role,is_active AS "isActive",created_at AS "createdAt" FROM agency_users WHERE agency_id=$1 ORDER BY created_at',[u.agencyId])).rows;}
+  async teamPresence(u:User){
+    return (await this.db.query(`SELECT a.id,a.full_name AS "fullName",a.role,
+      COALESCE(p.is_online=false OR p.last_seen_at<now()-interval '90 seconds',true) AS "isOnline",
+      p.last_seen_at AS "lastSeenAt"
+      FROM agency_users a LEFT JOIN agency_user_presence p ON p.user_id=a.id AND p.agency_id=a.agency_id
+      WHERE a.agency_id=$1 AND a.is_active=true ORDER BY a.full_name`,[u.agencyId])).rows;
+  }
+  async updateTeamPresence(u:User,b:any){
+    if(typeof b?.isOnline!=='boolean')throw new BadRequestException('isOnline must be true or false');
+    const r=await this.db.query(`INSERT INTO agency_user_presence(user_id,agency_id,is_online,last_seen_at)
+      SELECT id,agency_id,$3,now() FROM agency_users WHERE id=$1 AND agency_id=$2 AND is_active=true
+      ON CONFLICT(user_id,agency_id) DO UPDATE SET is_online=EXCLUDED.is_online,last_seen_at=now()
+      RETURNING is_online AS "isOnline",last_seen_at AS "lastSeenAt"`,[u.id,u.agencyId,b.isOnline]);
+    if(!r.rowCount)throw new NotFoundException('Active team member not found');
+    return r.rows[0];
+  }
   async addMember(u:User,b:any){
     this.requireRole(u,['owner','admin']);
     const email=String(b?.email||'').trim().toLowerCase(),fullName=String(b?.fullName||'').trim(),password=String(b?.password||''),role=String(b?.role||'agent');
