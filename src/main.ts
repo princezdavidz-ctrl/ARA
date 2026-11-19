@@ -13,6 +13,7 @@ async function bootstrap() {
   const allowedOrigins = new Set([
     'https://ara-dashboard-one.vercel.app',
     'https://ara-dashboard-princezdavidz-6985.vercel.app',
+    'https://ara-public-website.onrender.com',
     ...(process.env.DASHBOARD_ORIGIN || '').split(',').map((origin) => origin.trim()).filter(Boolean),
     ...(process.env.ARA_CRM_ORIGIN || '').split(',').map((origin) => origin.trim()).filter(Boolean),
     ...(process.env.ARA_ADMIN_ORIGIN || '').split(',').map((origin) => origin.trim()).filter(Boolean),
