@@ -48,12 +48,11 @@ export default function Navbar() {
         </div>
 
         <div className="hidden items-center gap-3 md:flex">
-          
           <a
             href="https://ara-company-crm.onrender.com/?mode=login"
             className="text-sm font-medium text-ink-200 transition-colors hover:text-white"
           >
-            Customer Login
+            Login
           </a>
           <a
             href="https://ara-company-crm.onrender.com/?mode=register"
@@ -90,7 +89,7 @@ export default function Navbar() {
               onClick={() => setOpen(false)}
               className="mt-2 rounded-full border border-white/20 px-4 py-2.5 text-center text-sm font-semibold text-white"
             >
-              Customer Login
+              Login
             </a>
             <a
               href="https://ara-company-crm.onrender.com/?mode=register"
