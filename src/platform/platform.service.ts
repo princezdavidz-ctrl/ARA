@@ -152,6 +152,35 @@ export class PlatformService implements OnApplicationBootstrap {
   async refresh(token:string){if(!token)throw new UnauthorizedException('Refresh token required');const hash=createHash('sha256').update(token).digest('hex');return this.db.transaction(async c=>{const r=await c.query('SELECT s.id,u.id AS "userId",u.agency_id AS "agencyId",u.email,u.full_name AS "fullName",u.role FROM refresh_sessions s JOIN agency_users u ON u.id=s.user_id JOIN agencies a ON a.id=u.agency_id WHERE s.token_hash=$1 AND s.revoked_at IS NULL AND s.expires_at>now() AND u.is_active=true AND a.is_active=true FOR UPDATE OF s',[hash]);const x=r.rows[0];if(!x)throw new UnauthorizedException('Invalid refresh token');await c.query('UPDATE refresh_sessions SET revoked_at=now() WHERE id=$1',[x.id]);const next=randomBytes(48).toString('base64url');await c.query('INSERT INTO refresh_sessions(user_id,token_hash,expires_at) VALUES($1,$2,now()+interval \'30 days\')',[x.userId,createHash('sha256').update(next).digest('hex')]);const user={id:x.userId,agencyId:x.agencyId,email:x.email,fullName:x.fullName,role:x.role};return {accessToken:this.accessToken(user),refreshToken:next,expiresIn:900};});}
   async logout(token:string){if(token)await this.db.query('UPDATE refresh_sessions SET revoked_at=now() WHERE token_hash=$1 AND revoked_at IS NULL',[createHash('sha256').update(token).digest('hex')]);return {success:true};}
   private requireRole(u:User,roles:string[]){if(!roles.includes(u.role))throw new ForbiddenException('Insufficient role');}
+  async listApiKeys(u:User){
+    this.requireRole(u,['owner','admin']);
+    return (await this.db.query(`SELECT id,name,key_prefix AS "keyPrefix",scopes,last_used_at AS "lastUsedAt",
+      expires_at AS "expiresAt",revoked_at AS "revokedAt",created_at AS "createdAt"
+      FROM agency_api_keys WHERE agency_id=$1 ORDER BY created_at DESC`,[u.agencyId])).rows;
+  }
+  async createApiKey(u:User,b:any){
+    this.requireRole(u,['owner','admin']);
+    const name=String(b?.name||'').trim();
+    if(name.length<2||name.length>80)throw new BadRequestException('API key name must be between 2 and 80 characters.');
+    const days=b?.expiresInDays===undefined?90:Number(b.expiresInDays);
+    if(!Number.isInteger(days)||days<1||days>365)throw new BadRequestException('API key expiry must be between 1 and 365 days.');
+    const secret='ara_live_'+randomBytes(32).toString('base64url');
+    const prefix=secret.slice(0,18),hash=createHash('sha256').update(secret).digest('hex');
+    const result=await this.db.query(`INSERT INTO agency_api_keys(agency_id,name,key_prefix,key_hash,scopes,created_by,expires_at)
+      VALUES($1,$2,$3,$4,ARRAY['conversations:write']::text[],$5,now()+($6::text||' days')::interval)
+      RETURNING id,name,key_prefix AS "keyPrefix",scopes,expires_at AS "expiresAt",created_at AS "createdAt"`,
+      [u.agencyId,name,prefix,hash,u.id,days]);
+    await this.audit(u.agencyId,u.id,'developer_api.key_created','api_key',result.rows[0].id,{name,scopes:['conversations:write']});
+    return {...result.rows[0],secret};
+  }
+  async revokeApiKey(u:User,id:string){
+    this.requireRole(u,['owner','admin']);
+    const result=await this.db.query(`UPDATE agency_api_keys SET revoked_at=now()
+      WHERE id=$1 AND agency_id=$2 AND revoked_at IS NULL RETURNING id,name`,[id,u.agencyId]);
+    if(!result.rowCount)throw new NotFoundException('Active API key not found');
+    await this.audit(u.agencyId,u.id,'developer_api.key_revoked','api_key',id,{name:result.rows[0].name});
+    return {success:true};
+  }
   async team(u:User){this.requireRole(u,['owner','admin','manager']);return (await this.db.query('SELECT id,email,full_name AS "fullName",role,is_active AS "isActive",created_at AS "createdAt" FROM agency_users WHERE agency_id=$1 ORDER BY created_at',[u.agencyId])).rows;}
   async teamPresence(u:User){
     return (await this.db.query(`SELECT a.id,a.full_name AS "fullName",a.role,
