@@ -1,4 +1,4 @@
-import { Sparkles, Github } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 
 const cols = [
   {
@@ -33,14 +33,6 @@ export default function Footer() {
               The Autonomous Respond Agent — supervised, evidence-grounded AI across WhatsApp,
               Email, Instagram and TikTok.
             </p>
-            <a
-              href="https://github.com/princezdavidz-ctrl/ARA"
-              target="_blank"
-              rel="noreferrer"
-              className="mt-5 inline-flex items-center gap-2 text-sm text-ink-300 transition-colors hover:text-white"
-            >
-              <Github className="h-4 w-4" /> View on GitHub
-            </a>
           </div>
 
           {cols.map((c) => (
