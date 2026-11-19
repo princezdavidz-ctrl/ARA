@@ -30,12 +30,16 @@ export class PlatformService implements OnApplicationBootstrap {
   private async audit(agencyId:string,actor:string|null,action:string,type:string,id:string|null,details:Record<string,unknown>={}){await this.db.query('INSERT INTO audit_logs(agency_id,actor_user_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5,$6)',[agencyId,actor,action,type,id,JSON.stringify(details)]);}
   async register(body:any){
     const name=String(body?.agencyName||'').trim(),fullName=String(body?.fullName||'').trim(),email=String(body?.email||'').trim().toLowerCase(),password=String(body?.password||'');
+    const primaryColor=String(body?.primaryColor||'#10B981').toUpperCase(),accentColor=String(body?.accentColor||'#0F172A').toUpperCase(),logoDataUrl=String(body?.logoDataUrl||'');
+    if(name.length<2||name.length>120||fullName.length<2||!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)||password.length<12)throw new BadRequestException('Provide a company name (2–120 characters), full name, valid email and password (minimum 12 characters).');
+    if(!/^#[0-9A-F]{6}$/.test(primaryColor)||!/^#[0-9A-F]{6}$/.test(accentColor))throw new BadRequestException('Brand colours must be valid six-digit hex colours.');
+    if(logoDataUrl && (logoDataUrl.length>1400000 || !/^data:image\\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(logoDataUrl)))throw new BadRequestException('Company logo must be a PNG, JPEG or WebP image smaller than 1 MB.');
     if(name.length<2||fullName.length<2||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||password.length<12)throw new BadRequestException('Provide agencyName, fullName, valid email and password (minimum 12 characters).');
     const slug=this.slug(name)+'-'+randomBytes(3).toString('hex'),hash=await this.hashPassword(password);
     try{
       const created=await this.db.transaction(async c=>{
         const a=await c.query('INSERT INTO agencies(name,slug) VALUES($1,$2) RETURNING id,name,slug',[name,slug]);
-        await c.query('INSERT INTO company_settings(agency_id,industry,display_name) VALUES($1,$2,$3)',[a.rows[0].id,'general',name]);
+        await c.query('INSERT INTO company_settings(agency_id,industry,display_name,logo_data_url,brand_primary_color,brand_accent_color) VALUES($1,$2,$3,$4,$5,$6)',[a.rows[0].id,'general',name,logoDataUrl||null,primaryColor,accentColor]);
         await c.query("INSERT INTO company_ai_settings(agency_id,response_mode) VALUES($1,'supervised')",[a.rows[0].id]);
         await c.query("INSERT INTO knowledge_bases(agency_id,name,industry,is_default) VALUES($1,'Company Knowledge','general',true)",[a.rows[0].id]);
         const u=await c.query('INSERT INTO agency_users(agency_id,email,full_name,password_hash,role) VALUES($1,$2,$3,$4,\'owner\') RETURNING id,agency_id AS "agencyId",email,full_name AS "fullName",role',[a.rows[0].id,email,fullName,hash]);
@@ -46,6 +50,26 @@ export class PlatformService implements OnApplicationBootstrap {
       const challenge=await this.otp.issue(email,created.user.id,'company_auth');
       return {...challenge,agency:created.agency,user:created.user};
     }catch(e:any){if(e.code==='23505')throw new ConflictException('Agency or account already exists.');throw e;}
+  }
+
+
+  async brandProfile(u:User){
+    const r=await this.db.query('SELECT a.name AS "companyName",cs.display_name AS "displayName",cs.logo_data_url AS "logoDataUrl",cs.brand_primary_color AS "primaryColor",cs.brand_accent_color AS "accentColor" FROM agencies a LEFT JOIN company_settings cs ON cs.agency_id=a.id WHERE a.id=$1 AND a.is_active=true',[u.agencyId]);
+    if(!r.rowCount)throw new NotFoundException('Company workspace not found');
+    return r.rows[0];
+  }
+  async updateBrandProfile(u:User,b:any){
+    this.requireRole(u,['owner','admin']);
+    const name=String(b?.companyName||'').trim(),primary=String(b?.primaryColor||'').toUpperCase(),accent=String(b?.accentColor||'').toUpperCase(),logo=String(b?.logoDataUrl||'');
+    if(name.length<2||name.length>120)throw new BadRequestException('Company name must be 2–120 characters.');
+    if(!/^#[0-9A-F]{6}$/.test(primary)||!/^#[0-9A-F]{6}$/.test(accent))throw new BadRequestException('Brand colours must be valid six-digit hex colours.');
+    if(logo && (logo.length>1400000 || !/^data:image\\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(logo)))throw new BadRequestException('Logo must be a PNG, JPEG or WebP image smaller than 1 MB.');
+    await this.db.transaction(async c=>{
+      await c.query('UPDATE agencies SET name=$2 WHERE id=$1',[u.agencyId,name]);
+      await c.query('UPDATE company_settings SET display_name=$2,logo_data_url=$3,brand_primary_color=$4,brand_accent_color=$5,updated_at=now() WHERE agency_id=$1',[u.agencyId,name,logo||null,primary,accent]);
+      await c.query("INSERT INTO audit_logs(agency_id,actor_user_id,action,target_type,target_id,details) VALUES($1,$2,'company.branding_updated','agency',$1::text,$3)",[u.agencyId,u.id,JSON.stringify({companyName:name,primaryColor:primary,accentColor:accent,logoUpdated:Boolean(logo)})]);
+    });
+    return this.brandProfile(u);
   }
 
   async resetOwnerPassword(body:any){
