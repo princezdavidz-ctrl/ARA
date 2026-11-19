@@ -367,3 +367,4 @@ button:not(.secondary):not(.danger){background:var(--brand);box-shadow:0 5px 14p
 .login-panel .workspace-choice-button:hover:not(:disabled){border-color:#10b981;background:#f3fbf7;transform:translateY(-1px);box-shadow:0 8px 18px rgba(16,159,114,.1)}
 .login-panel .workspace-choice-button:disabled{opacity:.65;cursor:wait}
 @media(prefers-reduced-motion:reduce){.login-spinner{animation:none}}
+.auth-switch a.text-link{display:inline-block;text-decoration:none;color:#526feb;font-size:11px;font-weight:700}
