@@ -206,3 +206,163 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
  .form-fieldset{grid-template-columns:1fr;padding:15px}
  .form-fieldset .wide{grid-column:auto}
 }
+
+
+/* Super Admin UI polish — operational clarity, responsive navigation and accessible controls */
+:root{
+  --admin-green:#078b68;
+  --admin-green-dark:#066d54;
+  --admin-green-soft:#e8f6f0;
+  --admin-ink:#183342;
+  --admin-muted:#687f8d;
+  --admin-line:#e2ebea;
+  --admin-bg:#f3f7f6;
+}
+html{scroll-behavior:smooth}
+body{background:var(--admin-bg);color:var(--admin-ink)}
+.app-shell{grid-template-columns:270px minmax(0,1fr);background:var(--admin-bg)}
+.sidebar{
+  z-index:5;
+  padding:25px 17px 18px;
+  background:linear-gradient(180deg,#102d2c 0%,#0c2225 100%);
+  border-right:1px solid #1b3b39;
+}
+.sidebar .brand{font-size:17px;letter-spacing:-.025em}
+.sidebar .brand:before{width:38px;height:38px;border-radius:12px}
+.nav{gap:4px}
+.nav-label{padding:15px 12px 6px;color:#80a69c;font-size:9px;letter-spacing:.15em}
+.nav button{min-height:43px;padding:10px 12px;border-radius:11px;font-size:12px}
+.nav button.active{background:linear-gradient(100deg,rgba(16,185,129,.23),rgba(16,185,129,.075));box-shadow:inset 3px 0 #4bd6a6;border-color:rgba(110,231,183,.15)}
+.nav-icon{width:23px;height:23px;display:grid;place-items:center;border-radius:7px;background:rgba(255,255,255,.055)}
+.nav button.active .nav-icon{background:rgba(110,231,183,.13)}
+.side-foot{line-height:1.8;color:#8ba9a2}
+.main{max-width:1760px;padding:32px clamp(20px,3.3vw,56px) 56px}
+.topbar{align-items:center;margin-bottom:28px;padding-bottom:22px;border-color:var(--admin-line)}
+.topbar .eyebrow{color:#0b8b69}
+.topbar h1{font-size:clamp(23px,2.1vw,29px);line-height:1.2;color:#163440}
+.topbar p{font-size:12px;color:#738995}
+.identity{gap:12px;color:#536d78}
+.identity button{min-height:39px;padding:9px 14px;border-radius:10px}
+.welcome-banner{min-height:210px;padding:clamp(24px,3vw,36px);border-radius:20px}
+.welcome-banner h2{max-width:620px;font-size:clamp(24px,2.4vw,33px)}
+.welcome-banner p{font-size:13px;line-height:1.65}
+.welcome-actions{gap:9px}
+.welcome-actions button{min-height:42px;border-radius:10px}
+.welcome-orbit{width:138px;height:138px;flex:0 0 138px}
+.overview-section-head{margin:31px 0 15px}
+.overview-section-head h2,.panel-heading h2{font-size:16px;color:#1c3b46}
+.live-indicator{padding:7px 10px;border:1px solid #dcece5;border-radius:99px;background:#f9fdfb;color:#54756b}
+.overview-stats{gap:14px}
+.overview-stats .stat{min-height:132px;padding:19px 20px;border-radius:16px}
+.overview-stats .stat strong{font-size:clamp(25px,2vw,31px)}
+.metric-icon{width:32px;height:32px;border-radius:10px}
+.metric-note{font-size:10px;line-height:1.5}
+.overview-grid{grid-template-columns:minmax(0,1.1fr) minmax(300px,.9fr);gap:15px}
+.overview-grid .panel{padding:21px}
+.panel-heading{align-items:flex-start}
+.soft-pill{border:1px solid #e3ece9;background:#f7fbf9;color:#5c7b72}
+.usage-value{font-size:36px}
+.usage-track{height:8px}
+.health-row{gap:12px;padding:14px 0}
+.health-row strong{font-size:12px}
+.health-row small{font-size:10px}
+.health-state{padding:5px 8px;border-radius:99px;background:#eaf7f0;font-size:9px}
+.quick-section{margin-top:29px}
+.quick-grid{gap:13px}
+.quick-card{min-height:80px;padding:15px;border-radius:14px}
+.quick-card>b{width:37px;height:37px;flex-basis:37px;border-radius:11px}
+.quick-card strong{font-size:11px}
+.quick-card small{font-size:10px}
+.section-head{margin:27px 0 14px}
+.section-head h2{font-size:16px;color:#1c3b46}
+.card,.panel{border-color:var(--admin-line);box-shadow:0 8px 24px rgba(21,57,62,.045)}
+.panel{padding:21px}
+.table-wrap{border-radius:15px}
+.data{font-size:12px}
+.data th{padding:14px 16px;background:#f6faf8;color:#71878b;font-size:9px;letter-spacing:.13em}
+.data td{padding:15px 16px;color:#35505c}
+.data tbody tr{transition:background .15s}
+.data tbody tr:hover{background:#f4faf7}
+.data td strong{color:#1b3c48}
+.pill{padding:5px 10px;font-size:10px}
+.toolbar{gap:9px;margin:15px 0}
+.toolbar input,.toolbar select{min-height:43px;min-width:210px}
+.field{gap:8px;color:#506b76;font-size:11px}
+.field input,.field select,.field textarea{min-height:44px;border-radius:10px;background:#fbfdfc}
+.form-grid{gap:10px 17px}
+.form-fieldset{padding:19px;border-color:#dfeae6;background:#fbfdfc}
+.form-fieldset legend{color:#087b5e}
+button{min-height:40px;border-radius:10px}
+button.secondary{border-color:#d9e9e2;background:#eef7f2;color:#276653}
+button.danger{border-color:#f4dadd;background:#fff1f2;color:#ad3b4b}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{
+  outline:3px solid rgba(7,139,104,.27);outline-offset:2px
+}
+.notice{border-radius:12px;line-height:1.7}
+.empty{padding:38px 22px;line-height:1.7}
+.detail-grid{gap:12px}
+.detail{padding:15px;border-radius:12px;background:#fbfdfc}
+.detail strong{font-size:13px}
+.ai-provider-grid{gap:15px}
+.ai-provider-card{padding:21px}
+.ai-provider-head h2{font-size:17px}
+.provider-meta{padding:12px 0}
+.provider-health{min-height:48px}
+.login-wrap{background:#fff}
+.login-visual{padding:clamp(32px,5vw,76px);background:radial-gradient(circle at 82% 25%,rgba(67,220,169,.2),transparent 31%),linear-gradient(145deg,#102d2c,#15564b 70%,#08765f)}
+.login-copy h1{line-height:1.08}
+.login-copy p{font-size:14px}
+.login{padding:clamp(30px,5vw,68px)}
+.login h2{font-size:29px}
+.login .field input{min-height:48px}
+.login>button,.login form>button{min-height:48px}
+.mobile-bar{padding:12px 16px}
+.mobile-bar select{min-height:39px}
+@media(max-width:1100px){
+  .app-shell{grid-template-columns:1fr}
+  .sidebar{position:relative;top:auto;height:auto;padding:15px 18px;gap:13px}
+  .sidebar .brand{padding:0 7px}
+  .nav{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .nav-label{padding-top:10px}
+  .side-foot{display:none}
+  .main{padding:23px}
+}
+@media(max-width:760px){
+  .overview-grid{grid-template-columns:1fr}
+  .quick-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .welcome-orbit{width:105px;height:105px;flex-basis:105px;margin-right:0}
+}
+@media(max-width:560px){
+  .main{padding:17px 13px 34px}
+  .topbar{align-items:flex-start;flex-direction:column;gap:12px;margin-bottom:21px}
+  .topbar h1{font-size:24px}
+  .identity{width:100%;flex-direction:row;justify-content:space-between;align-items:center}
+  .identity span{max-width:65%;text-align:left}
+  .nav{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .nav-label{grid-column:1/-1}
+  .welcome-banner{min-height:unset;padding:22px 18px}
+  .welcome-banner h2{font-size:23px}
+  .welcome-banner p{max-width:95%;font-size:11px}
+  .welcome-orbit{width:72px;height:72px;flex-basis:72px}
+  .welcome-orbit span{font-size:19px}
+  .welcome-orbit i{font-size:17px}
+  .welcome-actions{flex-wrap:wrap}
+  .welcome-actions button{font-size:10px;padding:9px 11px}
+  .overview-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+  .overview-stats .stat{min-height:115px;padding:14px}
+  .overview-stats .stat strong{font-size:24px}
+  .overview-grid .panel,.panel{padding:15px}
+  .quick-grid{grid-template-columns:1fr}
+  .quick-card{min-height:72px}
+  .data th,.data td{padding:11px 12px}
+  .form-grid{grid-template-columns:1fr}
+  .form-grid .wide,.form-grid>.form-fieldset{grid-column:1/-1}
+  .form-fieldset{grid-template-columns:1fr;padding:14px}
+  .form-fieldset .wide{grid-column:auto}
+  .detail-grid{grid-template-columns:1fr}
+  .login{padding:28px 21px}
+}
+@media(prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
