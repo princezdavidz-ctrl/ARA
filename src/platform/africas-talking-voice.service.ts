@@ -80,7 +80,8 @@ export class AfricaTalkingVoiceService {
     const clientRequestId=String(body?.clientRequestId||'').trim();
     const caller=String(body?.callerNumber||'').trim();
     const destination=String(body?.destinationNumber||'').trim();
-    const direction=String(body?.direction||'Inbound').toLowerCase().startsWith('out')?'outbound':'inbound';
+    const rawDirection=String(body?.direction||'').toLowerCase();
+    const direction=rawDirection?rawDirection.startsWith('out')?'outbound':'inbound':caller===connection.externalAccountId?'outbound':'inbound';
     const isActive=String(body?.isActive||'0')==='1';
     if(!sessionId||!caller||!destination||!this.validPhone(caller)||!this.validPhone(destination))throw new BadRequestException('Incomplete voice callback payload.');
     if(direction==='inbound'&&destination!==connection.externalAccountId)throw new UnauthorizedException('Inbound call destination does not match this voice connection.');
