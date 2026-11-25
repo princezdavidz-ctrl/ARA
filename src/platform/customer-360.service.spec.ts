@@ -10,6 +10,8 @@ describe('Customer360Service', () => {
     await expect(service.list(user)).resolves.toHaveLength(1);
     expect(db.query.mock.calls[0][1]).toEqual(['agency-1']);
     expect(db.query.mock.calls[0][0]).toContain('WHERE c.agency_id=$1');
+    expect(db.query.mock.calls[0][0]).toContain("position('@' in lower(trim(c.customer_contact)))");
+    expect(db.query.mock.calls[0][0]).toContain("THEN lower(trim(c.customer_contact))");
   });
 
   it('returns a not-found response for unknown or malformed customer IDs', async () => {
