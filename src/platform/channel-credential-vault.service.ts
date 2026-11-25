@@ -2,7 +2,7 @@ import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { createDecipheriv, createHash } from 'node:crypto';
 import { DatabaseService } from '../database/database.service';
 
-export type ChannelProvider='whatsapp'|'email'|'instagram'|'facebook_messenger'|'tiktok';
+export type ChannelProvider='whatsapp'|'email'|'instagram'|'facebook_messenger'|'tiktok'|'africas_talking_sms';
 export type ResolvedChannel={id:string;agencyId:string;provider:ChannelProvider;externalAccountId:string;externalPhoneNumberId:string|null;credentials:Record<string,string>;keyVersion:string;webhookVerified?:boolean};
 
 @Injectable()
@@ -43,10 +43,10 @@ export class ChannelCredentialVault {
     const row=r.rows[0]; if(!row)return null;
     return {id:row.id,agencyId:row.agencyId,provider:row.provider,externalAccountId:row.externalAccountId,externalPhoneNumberId:row.externalPhoneNumberId,credentials:this.decrypt(row.encrypted_credentials,row.keyVersion),keyVersion:row.keyVersion};
   }
-  async findByVerifyToken(provider:ChannelProvider,token:string):Promise<ResolvedChannel|null>{
+  async findByVerifyToken(provider:ChannelProvider,token:string,activeOnly=false):Promise<ResolvedChannel|null>{
     const hash=createHash('sha256').update(token).digest('hex');
     const r=await this.db.query<any>(`SELECT id,agency_id AS "agencyId",provider,external_account_id AS "externalAccountId",external_phone_number_id AS "externalPhoneNumberId",encrypted_credentials,credential_key_version AS "keyVersion"
-      FROM channel_connections WHERE provider=$1 AND status IN ('pending','active','reauthorization_required') AND webhook_secret_hash=$2 ORDER BY updated_at DESC LIMIT 2`,[provider,hash]);
+      FROM channel_connections WHERE provider=$1 AND status IN ('pending','active','reauthorization_required') AND ($3::boolean=false OR status='active') AND webhook_secret_hash=$2 ORDER BY updated_at DESC LIMIT 2`,[provider,hash,activeOnly]);
     if(r.rows.length>1) throw new ServiceUnavailableException('Webhook verification token maps to multiple channel connections');
     const row=r.rows[0];if(!row)return null;
     const credentials=this.decrypt(row.encrypted_credentials,row.keyVersion);
