@@ -91,7 +91,7 @@ export class AnswerService {
       const dayMap:{[key:string]:string}={Mon:'mon',Tue:'tue',Wed:'wed',Thu:'thu',Fri:'fri',Sat:'sat',Sun:'sun'};
       const day=dayMap[part('weekday')],slot=hours.days?.[day];
       const current=Number(part('hour'))*60+Number(part('minute'));
-      const start=String(slot?.start||'09:00').split(':').reduce((h:string,m:string)=>Number(h)*60+Number(m),0);
+      const start=String(slot?.start||'09:00').split(':').reduce<number>((h,m)=>Number(h)*60+Number(m),0);
       const end=String(slot?.end||'17:00').split(':').reduce((h:string,m:string)=>Number(h)*60+Number(m),0);
       const isOpen=!!slot?.enabled&&current>=start&&current<end;
       if(!isOpen){
