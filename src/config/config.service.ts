@@ -72,11 +72,16 @@ export class ConfigService implements OnModuleInit {
     if (!parsed.success) throw new Error(parsed.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join('; '));
     const wa = parsed.data;
     if (wa.ARA_CHANNEL_ENCRYPTION_KEY) { const k=wa.ARA_CHANNEL_ENCRYPTION_KEY; const validHex=/^[0-9a-f]{64}$/i.test(k); let validBase64=false; try { validBase64=Buffer.from(k,'base64').length===32; } catch {} if (!validHex&&!validBase64) throw new Error('ARA_CHANNEL_ENCRYPTION_KEY must encode exactly 32 bytes (64 hex characters or base64).'); }
-    const legacyWhatsAppConfigured = Boolean(wa.WHATSAPP_AGENCY_ID || wa.WHATSAPP_PHONE_NUMBER_ID || wa.WHATSAPP_VERIFY_TOKEN);
-    if (legacyWhatsAppConfigured && !(wa.WHATSAPP_AGENCY_ID && wa.WHATSAPP_PHONE_NUMBER_ID && wa.WHATSAPP_VERIFY_TOKEN && wa.WHATSAPP_APP_SECRET)) {
-      throw new Error('Legacy single-tenant WhatsApp configuration requires WHATSAPP_AGENCY_ID, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_VERIFY_TOKEN and WHATSAPP_APP_SECRET together.');
+    const legacyWhatsAppConfigured = Boolean(wa.WHATSAPP_AGENCY_ID || wa.WHATSAPP_PHONE_NUMBER_ID || wa.WHATSAPP_VERIFY_TOKEN || wa.WHATSAPP_APP_SECRET || wa.WHATSAPP_ACCESS_TOKEN);
+    const legacyWhatsAppComplete = Boolean(wa.WHATSAPP_AGENCY_ID && wa.WHATSAPP_PHONE_NUMBER_ID && wa.WHATSAPP_VERIFY_TOKEN && wa.WHATSAPP_APP_SECRET);
+    if (legacyWhatsAppConfigured && !legacyWhatsAppComplete) {
+      process.emitWarning('Incomplete legacy WhatsApp environment settings were ignored. Configure a complete legacy set or use tenant-scoped channel connections.');
+      wa.WHATSAPP_AGENCY_ID=undefined;
+      wa.WHATSAPP_PHONE_NUMBER_ID=undefined;
+      wa.WHATSAPP_VERIFY_TOKEN=undefined;
+      wa.WHATSAPP_APP_SECRET=undefined;
+      wa.WHATSAPP_ACCESS_TOKEN=undefined;
     }
-    if (wa.WHATSAPP_ACCESS_TOKEN && !(wa.WHATSAPP_AGENCY_ID && wa.WHATSAPP_PHONE_NUMBER_ID)) throw new Error('Outbound WhatsApp delivery requires WHATSAPP_AGENCY_ID and WHATSAPP_PHONE_NUMBER_ID.');
     const smtpAny = Boolean(wa.SMTP_HOST || wa.SMTP_PORT || wa.SMTP_USER || wa.SMTP_PASS || (wa.ARA_AUTH_EMAIL_FROM && !wa.RESEND_API_KEY));
     if (smtpAny && !(wa.SMTP_HOST && wa.SMTP_PORT && wa.SMTP_USER && wa.SMTP_PASS)) throw new Error('ARA OTP email requires SMTP_HOST, SMTP_PORT, SMTP_USER and SMTP_PASS together.');
     if (wa.ARA_AUTH_EMAIL_FROM && !wa.SMTP_USER && !wa.RESEND_API_KEY) throw new Error('ARA_AUTH_EMAIL_FROM requires SMTP_USER or RESEND_API_KEY.');
