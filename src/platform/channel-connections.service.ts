@@ -89,6 +89,7 @@ export class ChannelConnectionsService {
       if((connection.provider==='africas_talking_sms'||connection.provider==='africas_talking_voice')&&!['sandbox','production'].includes(connection.credentials.environment)) throw new BadRequestException('Africa\'s Talking environment must be sandbox or production');
       if((connection.provider==='africas_talking_sms'||connection.provider==='africas_talking_voice')&&connection.credentials.webhookVerifyToken.length<32) throw new BadRequestException('Africa\'s Talking webhookVerifyToken must be at least 32 characters');
       if(connection.provider==='africas_talking_voice'&&!/^\+[1-9]\d{7,14}$/.test(connection.credentials.transferNumber)) throw new BadRequestException('Africa\'s Talking transferNumber must be in international E.164 format');
+      if(connection.provider==='africas_talking_voice'&&connection.credentials.transferNumber===connection.externalAccountId) throw new BadRequestException('The agent transfer number must differ from the ARA voice number.');
       if(connection.provider==='email'&&!/^\S+@\S+\.\S+$/.test(connection.credentials.fromAddress)) throw new BadRequestException('Email fromAddress must be a valid verified sender address');
       return this.db.transaction(async client=>{
         const updated=await client.query<ConnectionRow>('UPDATE channel_connections SET status=\'active\',last_verified_at=now(),last_error_code=NULL,updated_at=now() WHERE agency_id=$1 AND id=$2 RETURNING '+this.projection(),[user.agencyId,id]);
