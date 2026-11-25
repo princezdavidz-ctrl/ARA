@@ -82,7 +82,8 @@ export class AnswerService {
     const enabled=settings.enabled!==false;
     const escalateSensitive=settings.escalate_sensitive_topics!==false;
     const configuredReplyLanguage=String(settings.ai_reply_language||'customer');
-    const lang=configuredReplyLanguage==='customer'?(x.preferredLanguage==='auto'?(settings.default_language==='sw'?'sw':'en'):x.preferredLanguage):(configuredReplyLanguage==='sw'?'sw':'en');
+    const inferredCustomerLanguage=/\\b(habari|tafadhali|asante|naomba|ninaomba|unafanya|mnatoa|bei gani|ni kiasi gani|sawa|karibu|shikamoo|pole|nisaidie|naweza)\\b/i.test(x.message)?'sw':(settings.default_language==='sw'?'sw':'en');
+    const lang=configuredReplyLanguage==='customer'?(x.preferredLanguage==='auto'?inferredCustomerLanguage:x.preferredLanguage):(configuredReplyLanguage==='sw'?'sw':'en');
     const hours=settings.ai_working_hours||{enabled:false};
     if(hours.enabled===true){
       const timezone=String(settings.timezone||'Africa/Nairobi');
