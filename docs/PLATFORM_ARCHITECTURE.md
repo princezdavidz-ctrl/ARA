@@ -114,3 +114,7 @@ Initial implementation order:
 ### Definition of done
 
 A channel is not complete merely because an API request succeeds. It must support authenticated tenant resolution, secure credential storage, inbound/outbound lifecycle, idempotency, provider status reconciliation, consent policy, human escalation, metering, audit logs, observability, migration rollback notes and automated tests. Live production readiness additionally requires provider account approval, valid sender/number provisioning and jurisdiction-specific compliance review.
+
+
+### Kenya-first SMS provider decision
+The first SMS adapter is Africa's Talking. Its published support matrix lists Kenya two-way SMS and Voice; Twilio's Kenya SMS guidance currently says two-way SMS is not supported, while its Kenya Voice guidance lists inbound and outbound calling. This makes Africa's Talking the preferred initial two-way SMS provider for the Kenya launch. This is a technical/provider-fit decision, not proof of account approval, sender-ID availability, callback configuration or live readiness. See `docs/AFRICAS_TALKING_SMS_SETUP.md`.
