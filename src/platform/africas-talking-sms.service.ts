@@ -85,7 +85,7 @@ export class AfricaTalkingSmsService implements OnModuleInit,OnModuleDestroy {
       const recipient=payload?.SMSMessageData?.Recipients?.[0];
       const providerId=String(recipient?.messageId||'');
       const statusCode=Number(recipient?.statusCode);
-      if(!response.ok||!providerId||![100,101,102,401,402,403,404,405,406,407,409,500].includes(statusCode)){
+      if(!response.ok||!providerId||![100,101,102].includes(statusCode)){
         const detail=String(recipient?.status||payload?.SMSMessageData?.Message||'Africa\'s Talking SMS API HTTP '+response.status);
         await this.fail(job,detail,(response.status>=400&&response.status<500&&response.status!==429)||statusCode>=400);return;
       }
