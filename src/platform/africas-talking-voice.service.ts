@@ -45,7 +45,7 @@ export class AfricaTalkingVoiceService {
     if(!username||!apiKey||!this.validPhone(transferNumber))throw new BadRequestException('Voice connection credentials or agent transfer number are incomplete.');
     const clientRequestId=randomUUID();
     const created=await this.db.transaction(async client=>{
-      const recent=await client.query('SELECT id FROM voice_calls WHERE connection_id=$1 AND direction=\\'outbound\\' AND created_at>now()-interval \\'1 second\\' LIMIT 1',[connection.id]);
+      const recent=await client.query('SELECT id FROM voice_calls WHERE connection_id=$1 AND direction=\'outbound\' AND created_at>now()-interval \'1 second\' LIMIT 1',[connection.id]);
       if(recent.rowCount)throw new TooManyRequestsException('This voice provider allows one outbound call initiation per second per connection.');
       const active=await client.query(\"SELECT count(*)::int AS count FROM voice_calls WHERE connection_id=$1 AND status IN ('queued','dialing','ringing','bridged')\",[connection.id]);
       if(Number(active.rows[0]?.count||0)>=40)throw new TooManyRequestsException('This voice connection has reached its 40-call concurrency limit.');
