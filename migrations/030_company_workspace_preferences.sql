@@ -1,4 +1,6 @@
--- Tenant-scoped workspace appearance, language and AI communication schedule.
+-- Tenant-scoped workspace appearance and AI communication schedule; interface language is per user.
+ALTER TABLE agency_users ADD COLUMN IF NOT EXISTS ui_language text NOT NULL DEFAULT 'en';
+ALTER TABLE agency_users ADD CONSTRAINT agency_users_ui_language_check CHECK(ui_language IN ('en','sw'));
 ALTER TABLE company_settings
   ADD COLUMN IF NOT EXISTS brand_background_color char(7) NOT NULL DEFAULT '#070B14',
   ADD COLUMN IF NOT EXISTS brand_surface_color char(7) NOT NULL DEFAULT '#0B1220',
@@ -6,7 +8,6 @@ ALTER TABLE company_settings
   ADD COLUMN IF NOT EXISTS brand_sidebar_color char(7) NOT NULL DEFAULT '#0C1728',
   ADD COLUMN IF NOT EXISTS brand_navbar_color char(7) NOT NULL DEFAULT '#0B1220',
   ADD COLUMN IF NOT EXISTS background_image_data_url text,
-  ADD COLUMN IF NOT EXISTS ui_language text NOT NULL DEFAULT 'en',
   ADD COLUMN IF NOT EXISTS ai_reply_language text NOT NULL DEFAULT 'customer',
   ADD COLUMN IF NOT EXISTS ai_working_hours jsonb NOT NULL DEFAULT '{"enabled":false,"days":{"mon":{"enabled":true,"start":"00:00","end":"23:59"},"tue":{"enabled":true,"start":"00:00","end":"23:59"},"wed":{"enabled":true,"start":"00:00","end":"23:59"},"thu":{"enabled":true,"start":"00:00","end":"23:59"},"fri":{"enabled":true,"start":"00:00","end":"23:59"},"sat":{"enabled":true,"start":"00:00","end":"23:59"},"sun":{"enabled":true,"start":"00:00","end":"23:59"}}}'::jsonb,
   ADD COLUMN IF NOT EXISTS ai_after_hours_action text NOT NULL DEFAULT 'message',
@@ -24,6 +25,5 @@ BEGIN
 END $$;
 
 ALTER TABLE company_settings
-  ADD CONSTRAINT company_settings_ui_language_check CHECK(ui_language IN ('en','sw')),
   ADD CONSTRAINT company_settings_ai_reply_language_check CHECK(ai_reply_language IN ('customer','en','sw')),
   ADD CONSTRAINT company_settings_ai_after_hours_action_check CHECK(ai_after_hours_action IN ('message','handoff'));
