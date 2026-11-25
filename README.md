@@ -72,3 +72,16 @@ Company owners/admins can initiate STK Push for an open KES invoice using `POST 
 
 ## Omnichannel SMS and voice expansion
 The approved architecture and phased plan are in [the omnichannel implementation plan](docs/OMNICHANNEL_COMMUNICATIONS_IMPLEMENTATION_PLAN.md). The first SMS adapter uses Africa's Talking; setup and callback instructions are in [the SMS integration guide](docs/AFRICAS_TALKING_SMS_SETUP.md).
+
+
+## Two-way SMS (Africa's Talking)
+
+ARA's first SMS adapter is Africa's Talking, selected as the Kenya-first option because its published support information lists two-way SMS in Kenya. The company owner/admin creates an `africas_talking_sms` connection in Company CRM > Integrations. Set `externalAccountId` to the approved sender ID or shortcode and encrypted credentials `username`, `apiKey`, `environment` (`sandbox` or `production`) and `webhookVerifyToken` (unique random secret, minimum 32 characters). Activation checks configuration presence; it does not replace sender-ID approval or a sandbox/live delivery test.
+
+Configure HTTPS callbacks:
+- Incoming: `POST /webhooks/africas-talking/sms/incoming?token=<webhookVerifyToken>`
+- Delivery report: `POST /webhooks/africas-talking/sms/delivery-report?token=<webhookVerifyToken>`
+
+Inbound messages enter the existing shared AI worker and company inbox. Outbound replies use approval gates, subscription quota reservations, retry handling and provider IDs. Delivery reports reconcile provider acceptance with delivered/failed state. STOP/UNSUBSCRIBE/CANCEL/END/QUIT opt the contact out; START/UNSTOP/YES opt them back in; HELP returns opt-out instructions. Opt-out suppression is checked again at send time. Marketing campaigns must require explicit purpose-specific opt-in.
+
+See [Africa's Talking SMS setup](docs/AFRICAS_TALKING_SMS_SETUP.md). This integration is not live until the company supplies valid credentials, configures provider callbacks, obtains sender-ID approval and completes sandbox and production pilot checks.
