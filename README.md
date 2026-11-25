@@ -85,3 +85,7 @@ Configure HTTPS callbacks:
 Inbound messages enter the existing shared AI worker and company inbox. Outbound replies use approval gates, subscription quota reservations, retry handling and provider IDs. Delivery reports reconcile provider acceptance with delivered/failed state. STOP/UNSUBSCRIBE/CANCEL/END/QUIT opt the contact out; START/UNSTOP/YES opt them back in; HELP returns opt-out instructions. Opt-out suppression is checked again at send time. Marketing campaigns must require explicit purpose-specific opt-in.
 
 See [Africa's Talking SMS setup](docs/AFRICAS_TALKING_SMS_SETUP.md). This integration is not live until the company supplies valid credentials, configures provider callbacks, obtains sender-ID approval and completes sandbox and production pilot checks.
+
+
+## Voice calls
+The Kenya-first voice integration and provider setup are documented in [Africa's Talking Voice setup](docs/AFRICAS_TALKING_VOICE_SETUP.md). The initial release supports call initiation, inbound call routing to a configured human transfer number, call events and tenant call history. AI voice reception and dynamic call queues are follow-on work.

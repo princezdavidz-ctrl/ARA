@@ -28,5 +28,8 @@ import { SupportService } from './support.service';
 import { PublicSupportController } from '../http/public-support.controller';
 import { ApiKeyGuard } from './api-key.guard';
 import { PublicApiController } from './public-api.controller';
-@Module({ controllers: [PlatformController, LeadController, PlatformAdminController, ChannelConnectionsController, BillingController, AdminIntegrationsController, AiUsageController, PublicSupportController, PublicApiController], providers: [PlatformService, LeadService, PlatformAdminService, ChannelConnectionsService, ChannelCredentialVault, BillingService, MpesaService, AdminIntegrationsService, AiUsageService, SubscriptionLimitsService, EmailOtpService, SupportService, AuthGuard, PlatformAdminGuard, ConfigService, DatabaseService, OpenAiService, AiOrchestratorService, LocalLlmService], exports: [AuthGuard, ChannelCredentialVault, BillingService] })
+import { VoiceController } from './voice.controller';
+import { AfricaTalkingVoiceWebhookController } from './africas-talking-voice-webhook.controller';
+import { AfricaTalkingVoiceService } from './africas-talking-voice.service';
+@Module({ controllers: [PlatformController, LeadController, PlatformAdminController, ChannelConnectionsController, BillingController, AdminIntegrationsController, AiUsageController, PublicSupportController, PublicApiController, VoiceController, AfricaTalkingVoiceWebhookController], providers: [PlatformService, LeadService, PlatformAdminService, ChannelConnectionsService, ChannelCredentialVault, BillingService, MpesaService, AdminIntegrationsService, AiUsageService, SubscriptionLimitsService, EmailOtpService, SupportService, AfricaTalkingVoiceService, AuthGuard, PlatformAdminGuard, ConfigService, DatabaseService, OpenAiService, AiOrchestratorService, LocalLlmService], exports: [AuthGuard, ChannelCredentialVault, BillingService] })
 export class PlatformModule {}

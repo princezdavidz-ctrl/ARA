@@ -26,6 +26,15 @@ const channels = [
     badge: 'New',
   },
   {
+    name: 'Voice Calls',
+    desc: 'Inbound and outbound business calls with human-agent transfer and call status tracking.',
+    iconSrc: 'https://img.icons8.com/color/48/phone.png',
+    iconAlt: 'Phone calls icon',
+    iconCredit: 'https://icons8.com/icons/set/phone',
+    tint: 'from-violet-500 to-indigo-600',
+    badge: 'New',
+  },
+  {
     name: 'Instagram',
     desc: 'Direct messages through the Meta Messaging API, with attachments escalated to humans.',
     iconSrc: 'https://img.icons8.com/color/48/instagram-new--v1.png',

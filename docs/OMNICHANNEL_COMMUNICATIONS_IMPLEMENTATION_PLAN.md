@@ -140,3 +140,7 @@ The architecture is approved; provider-specific production integration remains g
 
 ## Kenya-first SMS adapter decision
 Use Africa's Talking as the first provider adapter for two-way SMS in Kenya. Its published support information lists two-way SMS in Kenya; Twilio's Kenya SMS guidelines currently list two-way SMS as unsupported. Keep the adapter interface provider-neutral so other markets can add different providers. See `docs/AFRICAS_TALKING_SMS_SETUP.md` for tenant connection fields, callback URLs and sandbox-to-production checklist.
+
+
+## Kenya-first Voice adapter decision
+Use Africa's Talking Voice for the first Kenya call integration. The adapter supports inbound/outbound call initiation, callback-driven VoiceXML, call status events and a configured human transfer destination. Request a regular voice-enabled number for two-way calling. Call recording remains disabled by default. See `docs/AFRICAS_TALKING_VOICE_SETUP.md`. Follow-on work includes dynamic agent queues, IVR, voicemail, missed-call callbacks and a real AI speech pipeline.
