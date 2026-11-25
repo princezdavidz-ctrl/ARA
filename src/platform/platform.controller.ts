@@ -6,6 +6,7 @@ export class PlatformController {
   constructor(private readonly platform:PlatformService){}
   @Post('register') register(@Body() body:unknown){return this.platform.register(body);}
   @UseGuards(AuthGuard) @Get('brand-profile') brandProfile(@Req() req:{user:AraUser}){return this.platform.brandProfile(req.user);}
+  @UseGuards(AuthGuard) @Post('preferences') updatePreferences(@Req() req:{user:AraUser},@Body() body:unknown){return this.platform.updatePreferences(req.user,body);}
   @UseGuards(AuthGuard) @Post('brand-profile') updateBrandProfile(@Req() req:{user:AraUser},@Body() body:unknown){return this.platform.updateBrandProfile(req.user,body);}
   @Post('forgot-password') forgotPassword(@Body() body:unknown){return this.platform.requestCompanyPasswordReset(body);}
   @Post('reset-password') resetPassword(@Body() body:unknown){return this.platform.resetCompanyPassword(body);}
