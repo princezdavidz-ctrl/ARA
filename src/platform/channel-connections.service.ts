@@ -5,8 +5,8 @@ import { AraUser } from './auth.guard';
 import { ChannelCredentialVault } from './channel-credential-vault.service';
 import { SubscriptionLimitsService } from './subscription-limits.service';
 
-type Provider = 'whatsapp'|'email'|'instagram'|'facebook_messenger'|'tiktok';
-const providers: Provider[] = ['whatsapp','email','instagram','facebook_messenger','tiktok'];
+type Provider = 'whatsapp'|'email'|'instagram'|'facebook_messenger'|'tiktok'|'africas_talking_sms';
+const providers: Provider[] = ['whatsapp','email','instagram','facebook_messenger','tiktok','africas_talking_sms'];
 type ConnectionRow = { id:string; provider:Provider; displayName:string; externalAccountId:string; externalPhoneNumberId:string|null; status:string; scopes:string[]; lastVerifiedAt:string|null; lastErrorCode:string|null; createdAt:string; updatedAt:string; };
 
 @Injectable()
