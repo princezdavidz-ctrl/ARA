@@ -120,6 +120,7 @@ function applyCompanyBrand(profile){
   root.style.setProperty('--brand-navbar',profile.navbarColor||'#0B1220');
   if(profile.backgroundImageDataUrl)root.style.setProperty('--brand-background-image','url("'+profile.backgroundImageDataUrl+'")');else root.style.removeProperty('--brand-background-image');
   companyProfile=profile;
+  if(profile.uiLanguage){localStorage.setItem('ara_ui_language',profile.uiLanguage);applyUiLanguage(profile.uiLanguage);}
   var shell=document.querySelector('.app-shell'),layout=profile.layoutSettings||{};
   if(shell){
     shell.style.setProperty('--sidebar-width',(Number(layout.sidebarWidth)||258)+'px');
@@ -137,6 +138,12 @@ function applyCompanyBrand(profile){
   var top=document.getElementById('page-subtitle');if(top&&profile.companyName)top.textContent=profile.companyName+' · '+top.textContent;
 }
 
+function applyUiLanguage(language){
+  if(language!=='sw')return;
+  var labels={overview:'Muhtasari',inbox:'Kikasha',handoff:'Msaada wa mfanyakazi',approvals:'Idhini za AI',channels:'Miunganisho', 'api-keys':'API ya Wasanidi',knowledge:'Maarifa',billing:'Malipo','ai-usage':'Matumizi ya AI',team:'Timu',settings:'Mipangilio'};
+  document.querySelectorAll('.nav [data-page]').forEach(function(button){var key=button.dataset.page,icon=button.querySelector('.nav-icon');if(labels[key])button.innerHTML=(icon?icon.outerHTML:'')+labels[key];});
+  var select=document.getElementById('mobile-page');if(select)Array.from(select.options).forEach(function(option){if(labels[option.value])option.textContent=labels[option.value];});
+}
 function mountCompanyAssistant(){
   var shell=document.querySelector('.app-shell');if(!shell||document.getElementById('company-ai-assistant'))return;
   shell.insertAdjacentHTML('beforeend','<aside id="company-ai-assistant" class="company-ai-assistant"><section class="company-ai-panel" id="company-ai-panel" hidden><header><div><strong id="company-ai-title">Company AI Assistant</strong><small id="company-ai-language-label">Choose a language · Chagua lugha</small></div><button type="button" class="secondary" id="company-ai-close" aria-label="Close assistant">×</button></header><div class="company-ai-language" id="company-ai-language"><strong>Choose your language</strong><p>Chagua lugha yako ili kuendelea</p><button type="button" data-ai-language="en">English</button><button type="button" data-ai-language="sw">Kiswahili</button></div><div class="company-ai-messages" id="company-ai-messages" aria-live="polite" hidden></div><form id="company-ai-form" hidden><input name="message" maxlength="5000" required minlength="2" placeholder="Ask your company assistant…" aria-label="Message"><button type="submit" aria-label="Send message">Send</button></form><p class="company-ai-note">Answers use this company’s knowledge only. Unverified questions are sent for human review.</p><button type="button" class="company-ai-change-language" id="company-ai-change-language" hidden>Change language · Badili lugha</button></section><button type="button" class="company-ai-launcher" id="company-ai-open">✧ Ask your AI</button></aside>');
@@ -184,7 +191,7 @@ async function logout(){
   try{if(teamPresenceTimer)clearInterval(teamPresenceTimer);if(handoffRefreshTimer)clearInterval(handoffRefreshTimer);if(token)fetch(url('/platform/team/presence'),{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({isOnline:false}),keepalive:true});if(refresh)await fetch(url('/platform/logout'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refreshToken:refresh})});}catch(e){}
   teamPresenceOnline=false;sessionStorage.removeItem('ara_team_presence');token='';refresh='';user=null;sessionStorage.removeItem('ara_crm_token');sessionStorage.removeItem('ara_crm_refresh');sessionStorage.removeItem('ara_crm_user');loginView();
 }
-function pageTitle(title,subtitle){document.getElementById('page-title').textContent=title;document.getElementById('page-subtitle').textContent=subtitle;app.querySelectorAll('[data-page]').forEach(function(b){b.classList.toggle('active',b.dataset.page===page);});var mobilePage=document.getElementById('mobile-page');if(mobilePage)mobilePage.value=page;}
+function pageTitle(title,subtitle){var translations={Overview:'Muhtasari',Inbox:'Kikasha','Human handoff':'Msaada wa mfanyakazi','AI Approvals':'Idhini za AI',Integrations:'Miunganisho','Developer API':'API ya Wasanidi',Knowledge:'Maarifa',Billing:'Malipo','AI Usage':'Matumizi ya AI',Team:'Timu',Settings:'Mipangilio','Workspace settings':'Mipangilio ya nafasi ya kazi'};document.getElementById('page-title').textContent=localStorage.getItem('ara_ui_language')==='sw'?(translations[title]||title):title;document.getElementById('page-subtitle').textContent=subtitle;app.querySelectorAll('[data-page]').forEach(function(b){b.classList.toggle('active',b.dataset.page===page);});var mobilePage=document.getElementById('mobile-page');if(mobilePage)mobilePage.value=page;}
 function table(headers,rows){return '<div class="panel table-wrap"><table class="data"><thead><tr>'+headers.map(function(h){return '<th>'+h+'</th>';}).join('')+'</tr></thead><tbody>'+(rows.length?rows.join(''):'<tr><td class="empty" colspan="'+headers.length+'">No records found</td></tr>')+'</tbody></table></div>';}
 
 async function settings(){
