@@ -83,16 +83,7 @@ export class PlatformService implements OnApplicationBootstrap {
   }
 
   async brandProfile(u:User){
-    const r=await this.db.query(`SELECT a.name AS "companyName",cs.display_name AS "displayName",cs.logo_data_url AS "logoDataUrl",
-      cs.brand_primary_color AS "primaryColor",cs.brand_accent_color AS "accentColor",
-      cs.brand_background_color AS "backgroundColor",cs.brand_surface_color AS "surfaceColor",
-      cs.brand_text_color AS "textColor",cs.brand_sidebar_color AS "sidebarColor",cs.brand_navbar_color AS "navbarColor",
-      cs.background_image_data_url AS "backgroundImageDataUrl",cs.ui_language AS "uiLanguage",
-      cs.ai_reply_language AS "aiReplyLanguage",cs.ai_working_hours AS "aiWorkingHours",
-      cs.ai_after_hours_action AS "aiAfterHoursAction",cs.ai_after_hours_message AS "aiAfterHoursMessage",
-      cs.layout_settings AS "layoutSettings",cs.timezone
-      FROM agencies a LEFT JOIN company_settings cs ON cs.agency_id=a.id
-      WHERE a.id=$1 AND a.is_active=true`,[u.agencyId]);
+    const r=await this.db.query('SELECT a.name AS "companyName",cs.display_name AS "displayName",cs.logo_data_url AS "logoDataUrl",cs.brand_primary_color AS "primaryColor",cs.brand_accent_color AS "accentColor",cs.brand_background_color AS "backgroundColor",cs.brand_surface_color AS "surfaceColor",cs.brand_text_color AS "textColor",cs.brand_sidebar_color AS "sidebarColor",cs.brand_navbar_color AS "navbarColor",cs.background_image_data_url AS "backgroundImageDataUrl",cs.ui_language AS "uiLanguage",cs.ai_reply_language AS "aiReplyLanguage",cs.ai_working_hours AS "aiWorkingHours",cs.ai_after_hours_action AS "aiAfterHoursAction",cs.ai_after_hours_message AS "aiAfterHoursMessage",cs.layout_settings AS "layoutSettings",cs.timezone FROM agencies a LEFT JOIN company_settings cs ON cs.agency_id=a.id WHERE a.id=$1 AND a.is_active=true',[u.agencyId]);
     if(!r.rowCount)throw new NotFoundException('Company workspace not found');
     return r.rows[0];
   }
@@ -100,8 +91,7 @@ export class PlatformService implements OnApplicationBootstrap {
     this.requireRole(u,['owner','admin']);
     const name=String(b?.companyName||'').trim();
     const colors:{[key:string]:string}={primaryColor:String(b?.primaryColor||'').toUpperCase(),accentColor:String(b?.accentColor||'').toUpperCase(),backgroundColor:String(b?.backgroundColor||'#070B14').toUpperCase(),surfaceColor:String(b?.surfaceColor||'#0B1220').toUpperCase(),textColor:String(b?.textColor||'#E9EEF5').toUpperCase(),sidebarColor:String(b?.sidebarColor||'#0C1728').toUpperCase(),navbarColor:String(b?.navbarColor||'#0B1220').toUpperCase()};
-    const logo=String(b?.logoDataUrl||''),background=String(b?.backgroundImageDataUrl||'');
-    const imagePattern=/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
+    const logo=String(b?.logoDataUrl||''),background=String(b?.backgroundImageDataUrl||''),imagePattern=/^data:image\\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
     if(name.length<2||name.length>120)throw new BadRequestException('Company name must be 2–120 characters.');
     if(Object.values(colors).some(v=>!/^#[0-9A-F]{6}$/.test(v)))throw new BadRequestException('All theme colours must be valid six-digit hex colours.');
     if(logo&&(!imagePattern.test(logo)||logo.length>1400000))throw new BadRequestException('Logo must be PNG, JPEG or WebP and smaller than 1 MB.');
@@ -113,28 +103,20 @@ export class PlatformService implements OnApplicationBootstrap {
     const hours=b?.aiWorkingHours&&typeof b.aiWorkingHours==='object'?b.aiWorkingHours:{enabled:false,days:{}};
     if(typeof hours.enabled!=='boolean')throw new BadRequestException('AI working-hours enabled must be true or false.');
     const dayKeys=['mon','tue','wed','thu','fri','sat','sun'];
-    for(const day of dayKeys){const slot=hours.days?.[day];if(slot){if(typeof slot.enabled!=='boolean'||!/^([01]\\d|2[0-3]):[0-5]\\d$/.test(String(slot.start))||!/^([01]\\d|2[0-3]):[0-5]\\d$/.test(String(slot.end)))throw new BadRequestException('Working hours must use valid 24-hour times.');}}
-    const action=String(b?.aiAfterHoursAction||'message');
+    for(const day of dayKeys){const slot=hours.days?.[day];if(slot&&(typeof slot.enabled!=='boolean'||!/^([01]\\d|2[0-3]):[0-5]\\d$/.test(String(slot.start))||!/^([01]\\d|2[0-3]):[0-5]\\d$/.test(String(slot.end))))throw new BadRequestException('Working hours must use valid 24-hour times.');}
+    const action=String(b?.aiAfterHoursAction||'message'),afterHoursMessage=String(b?.aiAfterHoursMessage||'').trim();
     if(!['message','handoff'].includes(action))throw new BadRequestException('Choose a valid after-hours action.');
-    const afterHoursMessage=String(b?.aiAfterHoursMessage||'').trim();
     if(afterHoursMessage.length<2||afterHoursMessage.length>500)throw new BadRequestException('After-hours message must be 2–500 characters.');
     const layout=b?.layoutSettings&&typeof b.layoutSettings==='object'?b.layoutSettings:{};
     const allowedLayout={sidebarWidth:Math.min(360,Math.max(200,Number(layout.sidebarWidth)||258)),sidebarPosition:['left','top'].includes(layout.sidebarPosition)?layout.sidebarPosition:'left',navbarStyle:['standard','compact','hidden'].includes(layout.navbarStyle)?layout.navbarStyle:'standard',dashboardLayout:['comfortable','compact','wide'].includes(layout.dashboardLayout)?layout.dashboardLayout:'comfortable',navItems:Array.isArray(layout.navItems)?layout.navItems.filter((x:string)=>['overview','inbox','handoff','approvals','channels','api-keys','knowledge','billing','ai-usage','team'].includes(x)).slice(0,10):[]};
+    const normalizedHours={enabled:hours.enabled,days:Object.fromEntries(dayKeys.map(day=>{const slot=hours.days?.[day]||{};return [day,{enabled:slot.enabled===true,start:String(slot.start||'09:00'),end:String(slot.end||'17:00')}];}))};
     await this.db.transaction(async c=>{
       await c.query('UPDATE agencies SET name=$2 WHERE id=$1',[u.agencyId,name]);
-      await c.query(`UPDATE company_settings SET display_name=$2,
-        logo_data_url=CASE WHEN $3::boolean THEN NULL WHEN $4::text IS NOT NULL THEN $4 ELSE logo_data_url END,
-        brand_primary_color=$5,brand_accent_color=$6,brand_background_color=$7,brand_surface_color=$8,
-        brand_text_color=$9,brand_sidebar_color=$10,brand_navbar_color=$11,
-        background_image_data_url=CASE WHEN $12::boolean THEN NULL WHEN $13::text IS NOT NULL THEN $13 ELSE background_image_data_url END,
-        ui_language=$14,ai_reply_language=$15,ai_working_hours=$16::jsonb,ai_after_hours_action=$17,
-        ai_after_hours_message=$18,layout_settings=$19::jsonb,timezone=$20,updated_at=now()
-        WHERE agency_id=$1`,[u.agencyId,name,Boolean(b?.removeLogo),logo||null,colors.primaryColor,colors.accentColor,colors.backgroundColor,colors.surfaceColor,colors.textColor,colors.sidebarColor,colors.navbarColor,Boolean(b?.removeBackgroundImage),background||null,uiLanguage,aiReplyLanguage,JSON.stringify({enabled:hours.enabled,days:Object.fromEntries(dayKeys.map(day=>{const s=hours.days?.[day]||{};return [day,{enabled:s.enabled===true,start:String(s.start||'09:00'),end:String(s.end||'17:00')}];}))}),action,afterHoursMessage,JSON.stringify(allowedLayout),timezone]);
+      await c.query('UPDATE company_settings SET display_name=$2,logo_data_url=CASE WHEN $3::boolean THEN NULL WHEN $4::text IS NOT NULL THEN $4 ELSE logo_data_url END,brand_primary_color=$5,brand_accent_color=$6,brand_background_color=$7,brand_surface_color=$8,brand_text_color=$9,brand_sidebar_color=$10,brand_navbar_color=$11,background_image_data_url=CASE WHEN $12::boolean THEN NULL WHEN $13::text IS NOT NULL THEN $13 ELSE background_image_data_url END,ui_language=$14,ai_reply_language=$15,ai_working_hours=$16::jsonb,ai_after_hours_action=$17,ai_after_hours_message=$18,layout_settings=$19::jsonb,timezone=$20,updated_at=now() WHERE agency_id=$1',[u.agencyId,name,Boolean(b?.removeLogo),logo||null,colors.primaryColor,colors.accentColor,colors.backgroundColor,colors.surfaceColor,colors.textColor,colors.sidebarColor,colors.navbarColor,Boolean(b?.removeBackgroundImage),background||null,uiLanguage,aiReplyLanguage,JSON.stringify(normalizedHours),action,afterHoursMessage,JSON.stringify(allowedLayout),timezone]);
       await c.query("INSERT INTO audit_logs(agency_id,actor_user_id,action,target_type,target_id,details) VALUES($1,$2,'company.workspace_settings_updated','agency',$1::text,$3)",[u.agencyId,u.id,JSON.stringify({companyName:name,uiLanguage,aiReplyLanguage,timezone,workingHoursEnabled:hours.enabled,backgroundImageUpdated:Boolean(background),logoUpdated:Boolean(logo)})]);
     });
     return this.brandProfile(u);
   }
-
   async resetOwnerPassword(body:any){
     const supplied=String(body?.setupToken||'');
     const configured=String(process.env.OWNER_PASSWORD_RESET_TOKEN||'');
