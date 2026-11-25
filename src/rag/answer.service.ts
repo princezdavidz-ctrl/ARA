@@ -92,7 +92,7 @@ export class AnswerService {
       const day=dayMap[part('weekday')],slot=hours.days?.[day];
       const current=Number(part('hour'))*60+Number(part('minute'));
       const start=String(slot?.start||'09:00').split(':').reduce<number>((h,m)=>Number(h)*60+Number(m),0);
-      const end=String(slot?.end||'17:00').split(':').reduce((h:string,m:string)=>Number(h)*60+Number(m),0);
+      const end=String(slot?.end||'17:00').split(':').reduce<number>((h,m)=>Number(h)*60+Number(m),0);
       const isOpen=!!slot?.enabled&&current>=start&&current<end;
       if(!isOpen){
         const message=String(settings.ai_after_hours_message||'Thank you for contacting us. Our AI communication hours have ended. We will respond when service resumes.');
