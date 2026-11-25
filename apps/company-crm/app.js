@@ -120,6 +120,17 @@ function applyCompanyBrand(profile){
   root.style.setProperty('--brand-navbar',profile.navbarColor||'#0B1220');
   if(profile.backgroundImageDataUrl)root.style.setProperty('--brand-background-image','url("'+profile.backgroundImageDataUrl+'")');else root.style.removeProperty('--brand-background-image');
   companyProfile=profile;
+  var shell=document.querySelector('.app-shell'),layout=profile.layoutSettings||{};
+  if(shell){
+    shell.style.setProperty('--sidebar-width',(Number(layout.sidebarWidth)||258)+'px');
+    shell.classList.toggle('sidebar-top',layout.sidebarPosition==='top');
+    shell.classList.toggle('navbar-compact',layout.navbarStyle==='compact');
+    shell.classList.toggle('navbar-hidden',layout.navbarStyle==='hidden');
+    shell.classList.toggle('dashboard-compact',layout.dashboardLayout==='compact');
+    shell.classList.toggle('dashboard-wide',layout.dashboardLayout==='wide');
+    var nav=shell.querySelector('.nav'),items=Array.isArray(layout.navItems)?layout.navItems:[];
+    if(nav&&items.length){nav.querySelectorAll('[data-page]').forEach(function(button){button.hidden=!items.includes(button.dataset.page);});nav.querySelectorAll('.nav-label').forEach(function(label){label.hidden=true;});items.forEach(function(key){var button=nav.querySelector('[data-page="'+key+'"]');if(button)nav.appendChild(button);});}
+  }
   var label=profile.displayName||profile.companyName||'ARA';
   var lockup=document.querySelector('.brand-lockup');
   if(lockup){var mark=lockup.querySelector('.brand-mark');if(mark){mark.innerHTML=profile.logoDataUrl?'<img alt="" src="'+esc(profile.logoDataUrl)+'">':'✦';}var text=lockup.querySelector('span:last-child');if(text)text.innerHTML=esc(label)+'<small>COMPANY WORKSPACE</small>';}
