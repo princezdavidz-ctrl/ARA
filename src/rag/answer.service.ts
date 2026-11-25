@@ -97,7 +97,7 @@ export class AnswerService {
       if(!isOpen){
         const message=String(settings.ai_after_hours_message||'Thank you for contacting us. Our AI communication hours have ended. We will respond when service resumes.');
         const handoff=settings.ai_after_hours_action==='handoff';
-        return {answer:message,language:lang,status:handoff?'needs_human' as const:'answered' as const,responseMode,confidence:'high' as const,citations:[],escalationReason:handoff?'AI communication is outside configured working hours.':null};
+        return {answer:message,language:lang,status:handoff?'needs_human' as const:'answered' as const,responseMode:'automatic' as const,afterHoursReply:true,confidence:'high' as const,citations:[],escalationReason:handoff?'AI communication is outside configured working hours.':null};
       }
     }
 
