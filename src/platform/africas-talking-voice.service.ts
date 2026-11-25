@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, TooManyRequestsException, UnauthorizedException } from '@nestjs/common';
 import { createHash, randomUUID } from 'node:crypto';
 import { DatabaseService } from '../database/database.service';
 import { ChannelCredentialVault, ResolvedChannel } from './channel-credential-vault.service';
@@ -45,6 +45,10 @@ export class AfricaTalkingVoiceService {
     if(!username||!apiKey||!this.validPhone(transferNumber))throw new BadRequestException('Voice connection credentials or agent transfer number are incomplete.');
     const clientRequestId=randomUUID();
     const created=await this.db.transaction(async client=>{
+      const recent=await client.query('SELECT id FROM voice_calls WHERE connection_id=$1 AND direction=\\'outbound\\' AND created_at>now()-interval \\'1 second\\' LIMIT 1',[connection.id]);
+      if(recent.rowCount)throw new TooManyRequestsException('This voice provider allows one outbound call initiation per second per connection.');
+      const active=await client.query(\"SELECT count(*)::int AS count FROM voice_calls WHERE connection_id=$1 AND status IN ('queued','dialing','ringing','bridged')\",[connection.id]);
+      if(Number(active.rows[0]?.count||0)>=40)throw new TooManyRequestsException('This voice connection has reached its 40-call concurrency limit.');
       const conversation=await client.query("INSERT INTO conversations(agency_id,channel,channel_connection_id,customer_contact) VALUES($1,'phone',$2,$3) RETURNING id",[user.agencyId,connection.id,to]);
       const call=await client.query("INSERT INTO voice_calls(agency_id,connection_id,conversation_id,direction,client_request_id,caller_number,destination_number,status,metadata) VALUES($1,$2,$3,'outbound',$4,$5,$6,'queued',$7::jsonb) RETURNING id,client_request_id AS \"clientRequestId\",conversation_id AS \"conversationId\"",
         [user.agencyId,connection.id,conversation.rows[0].id,clientRequestId,connection.externalAccountId,to,JSON.stringify({initiatedBy:user.id})]);
