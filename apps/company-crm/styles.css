@@ -420,8 +420,8 @@ button:not(.secondary):not(.danger){background:linear-gradient(135deg,var(--bran
 .topbar{background:var(--brand-navbar)}
 .card,.panel,.settings-preview{background:color-mix(in srgb,var(--brand-surface) 94%,transparent);color:var(--brand-text);border-color:color-mix(in srgb,var(--brand-text) 12%,transparent)}
 .app-shell .main{color:var(--brand-text)}
-.sidebar-top .app-shell{grid-template-columns:1fr}
-.sidebar-top .sidebar{position:relative;top:auto;height:auto;grid-column:1/-1;flex-direction:row;align-items:center;flex-wrap:wrap}
+.app-shell.sidebar-top{grid-template-columns:1fr}
+.app-shell.sidebar-top .sidebar{position:relative;top:auto;height:auto;grid-column:1/-1;flex-direction:row;align-items:center;flex-wrap:wrap}
 .sidebar-top .sidebar .nav{display:flex;flex-wrap:wrap;flex:1}
 .navbar-compact .topbar{padding:9px 14px;margin-bottom:14px}
 .navbar-hidden .topbar{display:none}
