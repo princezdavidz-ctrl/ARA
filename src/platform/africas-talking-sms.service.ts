@@ -26,15 +26,25 @@ export class AfricaTalkingSmsService implements OnModuleInit,OnModuleDestroy {
     const to=String(payload?.to||'').trim();
     const text=String(payload?.text||'').trim();
     const providerId=String(payload?.id||payload?.messageId||'').trim();
-    if(!/^\+?[1-9]\d{7,14}$/.test(from)||!text||text.length>5000||!providerId)throw new UnauthorizedException('Incomplete or invalid incoming SMS callback');
+    if(!/^\\+?[1-9]\\d{7,14}$/.test(from)||!text||text.length>5000||!providerId)throw new UnauthorizedException('Incomplete or invalid incoming SMS callback');
     if(connection.externalAccountId&&to&&connection.externalAccountId!==to)throw new UnauthorizedException('SMS destination does not match this tenant connection');
+    const keyword=text.trim().toUpperCase().replace(/[.!\\s]+$/g,'');
+    const keywordReplies:Record<string,string>={STOP:'You have been unsubscribed from SMS messages. Reply START to resubscribe.',UNSUBSCRIBE:'You have been unsubscribed from SMS messages. Reply START to resubscribe.',CANCEL:'You have been unsubscribed from SMS messages. Reply START to resubscribe.',END:'You have been unsubscribed from SMS messages. Reply START to resubscribe.',QUIT:'You have been unsubscribed from SMS messages. Reply START to resubscribe.',START:'You are now subscribed to SMS messages.',UNSTOP:'You are now subscribed to SMS messages.',YES:'You are now subscribed to SMS messages.',HELP:'ARA SMS help: reply STOP to opt out or START to resubscribe.'};
+    const stop=['STOP','UNSUBSCRIBE','CANCEL','END','QUIT'].includes(keyword);
+    const start=['START','UNSTOP','YES'].includes(keyword);
+    const reply=keywordReplies[keyword];
     const result=await this.db.transaction(async client=>{
       const found=await client.query("SELECT id FROM conversations WHERE agency_id=$1 AND channel='sms' AND channel_connection_id=$2 AND customer_contact=$3 AND status<>'closed' ORDER BY updated_at DESC LIMIT 1 FOR UPDATE",[connection.agencyId,connection.id,from]);
       let conversationId=found.rows[0]?.id;
       if(!conversationId){const created=await client.query("INSERT INTO conversations(agency_id,channel,channel_connection_id,customer_name,customer_contact) VALUES($1,'sms',$2,NULL,$3) RETURNING id",[connection.agencyId,connection.id,from]);conversationId=created.rows[0].id;}
-      const inserted=await client.query("INSERT INTO messages(agency_id,conversation_id,direction,sender_type,body,idempotency_key,delivery_status,processing_status) VALUES($1,$2,'inbound','customer',$3,$4,'stored','pending') ON CONFLICT(agency_id,idempotency_key) DO NOTHING RETURNING id",[connection.agencyId,conversationId,text,'africas-talking:'+connection.id+':'+providerId]);
-      if(inserted.rowCount)await client.query('UPDATE conversations SET updated_at=now() WHERE id=$1 AND agency_id=$2',[conversationId,connection.agencyId]);
-      return {accepted:Boolean(inserted.rowCount),conversationId};
+      await client.query("INSERT INTO sms_contact_preferences(agency_id,phone_number,consent_status,opted_in_at,opted_out_at,last_inbound_at) VALUES($1,$2,$3,CASE WHEN $3='opted_in' THEN now() END,CASE WHEN $3='opted_out' THEN now() END,now()) ON CONFLICT(agency_id,phone_number) DO UPDATE SET consent_status=CASE WHEN $4 THEN 'opted_out' WHEN $5 THEN 'opted_in' ELSE sms_contact_preferences.consent_status END,opted_in_at=CASE WHEN $5 THEN now() ELSE sms_contact_preferences.opted_in_at END,opted_out_at=CASE WHEN $4 THEN now() WHEN $5 THEN NULL ELSE sms_contact_preferences.opted_out_at END,last_inbound_at=now(),updated_at=now()",
+        [connection.agencyId,from,stop?'opted_out':start?'opted_in':'unknown',stop,start]);
+      const inserted=await client.query("INSERT INTO messages(agency_id,conversation_id,direction,sender_type,body,idempotency_key,delivery_status,processing_status) VALUES($1,$2,'inbound','customer',$3,$4,'stored',$5) ON CONFLICT(agency_id,idempotency_key) DO NOTHING RETURNING id",[connection.agencyId,conversationId,text,'africas-talking:'+connection.id+':'+providerId,reply?'not_applicable':'pending']);
+      if(inserted.rowCount){
+        await client.query('UPDATE conversations SET updated_at=now() WHERE id=$1 AND agency_id=$2',[conversationId,connection.agencyId]);
+        if(reply)await client.query("INSERT INTO messages(agency_id,conversation_id,direction,sender_type,body,idempotency_key,delivery_status,processing_status,approval_status) VALUES($1,$2,'outbound','system',$3,$4,'queued','not_applicable','approved') ON CONFLICT(agency_id,idempotency_key) DO NOTHING",[connection.agencyId,conversationId,reply,'sms-system:'+connection.id+':'+providerId]);
+      }
+      return {accepted:Boolean(inserted.rowCount),conversationId,keywordAction:stop?'opted_out':start?'opted_in':reply?'help':'none'};
     });
     return {received:true,...result};
   }
@@ -47,7 +57,9 @@ export class AfricaTalkingSmsService implements OnModuleInit,OnModuleDestroy {
     const delivered=['success','successful','delivered'].includes(status);
     const failed=['failed','rejected','undelivered','expired'].includes(status);
     if(!delivered&&!failed)return {received:true,updated:false};
-    const result=await this.db.query("UPDATE messages m SET delivery_status=$3,delivery_error=CASE WHEN $3='failed' THEN left(COALESCE($4,'SMS provider reported delivery failure'),1000) ELSE NULL END,delivery_started_at=NULL,delivery_next_attempt_at=NULL FROM conversations cv WHERE cv.id=m.conversation_id AND cv.agency_id=m.agency_id AND cv.agency_id=$1 AND cv.channel_connection_id=$2 AND m.provider_message_id=$5 AND m.direction='outbound' AND m.delivery_status IN ('sent','delivered') RETURNING m.id",[connection.agencyId,connection.id,delivered?'delivered':'failed',String(payload?.failureReason||payload?.failure_reason||'SMS delivery failed'),providerId]);
+    const details={status,phoneNumber:String(payload?.phoneNumber||''),networkCode:String(payload?.networkCode||''),failureReason:String(payload?.failureReason||payload?.failure_reason||'')};
+    await this.db.query("INSERT INTO sms_delivery_reports(agency_id,connection_id,provider_message_id,status,details) VALUES($1,$2,$3,$4,$5::jsonb) ON CONFLICT(connection_id,provider_message_id) DO UPDATE SET status=EXCLUDED.status,details=EXCLUDED.details,received_at=now()",[connection.agencyId,connection.id,providerId,delivered?'delivered':'failed',JSON.stringify(details)]);
+    const result=await this.db.query("UPDATE messages m SET delivery_status=$3,delivery_error=CASE WHEN $3='failed' THEN left(COALESCE($4,'SMS provider reported delivery failure'),1000) ELSE NULL END,delivery_started_at=NULL,delivery_next_attempt_at=NULL FROM conversations cv WHERE cv.id=m.conversation_id AND cv.agency_id=m.agency_id AND cv.agency_id=$1 AND cv.channel_connection_id=$2 AND m.provider_message_id=$5 AND m.direction='outbound' AND m.delivery_status IN ('sent','delivered') RETURNING m.id",[connection.agencyId,connection.id,delivered?'delivered':'failed',details.failureReason||'SMS delivery failed',providerId]);
     return {received:true,updated:Boolean(result.rowCount)};
   }
 
@@ -60,7 +72,7 @@ export class AfricaTalkingSmsService implements OnModuleInit,OnModuleDestroy {
   private async claim():Promise<SmsJob|null>{
     return this.db.transaction(async client=>{
       await client.query("UPDATE messages m SET delivery_status='failed',delivery_started_at=NULL,delivery_error='SMS delivery lease expired after final attempt' FROM conversations cv WHERE cv.id=m.conversation_id AND cv.agency_id=m.agency_id AND cv.channel='sms' AND m.direction='outbound' AND m.delivery_status='sending' AND m.delivery_started_at<now()-interval '5 minutes' AND m.delivery_attempts>=5");
-      const r=await client.query<SmsJob>("SELECT m.id,m.agency_id AS \"agencyId\",m.conversation_id AS \"conversationId\",m.body,cv.customer_contact AS recipient,cv.channel_connection_id AS \"connectionId\",m.delivery_attempts AS attempts FROM messages m JOIN conversations cv ON cv.id=m.conversation_id AND cv.agency_id=m.agency_id JOIN channel_connections cc ON cc.id=cv.channel_connection_id AND cc.agency_id=cv.agency_id AND cc.status='active' AND cc.provider='africas_talking_sms' WHERE m.direction='outbound' AND m.approval_status='approved' AND m.delivery_attempts<5 AND ((m.delivery_status='queued' AND (m.delivery_next_attempt_at IS NULL OR m.delivery_next_attempt_at<=now())) OR (m.delivery_status='sending' AND m.delivery_started_at<now()-interval '5 minutes')) ORDER BY m.created_at LIMIT 1 FOR UPDATE OF m SKIP LOCKED");
+      const r=await client.query<SmsJob>("SELECT m.id,m.agency_id AS \"agencyId\",m.conversation_id AS \"conversationId\",m.body,cv.customer_contact AS recipient,cv.channel_connection_id AS \"connectionId\",m.delivery_attempts AS attempts FROM messages m JOIN conversations cv ON cv.id=m.conversation_id AND cv.agency_id=m.agency_id JOIN channel_connections cc ON cc.id=cv.channel_connection_id AND cc.agency_id=cv.agency_id AND cc.status='active' AND cc.provider='africas_talking_sms' LEFT JOIN sms_contact_preferences pref ON pref.agency_id=cv.agency_id AND pref.phone_number=cv.customer_contact WHERE m.direction='outbound' AND m.approval_status='approved' AND (pref.consent_status IS DISTINCT FROM 'opted_out' OR m.sender_type='system') AND m.delivery_attempts<5 AND ((m.delivery_status='queued' AND (m.delivery_next_attempt_at IS NULL OR m.delivery_next_attempt_at<=now())) OR (m.delivery_status='sending' AND m.delivery_started_at<now()-interval '5 minutes')) ORDER BY m.created_at LIMIT 1 FOR UPDATE OF m SKIP LOCKED");
       const job=r.rows[0];if(!job)return null;job.attempts=Number(job.attempts)+1;
       await client.query("UPDATE messages SET delivery_status='sending',delivery_started_at=now(),delivery_attempts=$2,delivery_error=NULL WHERE id=$1",[job.id,job.attempts]);
       return job;
@@ -89,6 +101,7 @@ export class AfricaTalkingSmsService implements OnModuleInit,OnModuleDestroy {
         await this.fail(job,detail,(response.status>=400&&response.status<500&&response.status!==429)||statusCode>=400);return;
       }
       await this.db.query("UPDATE messages SET delivery_status='sent',provider_message_id=$2,delivery_started_at=NULL,delivery_next_attempt_at=NULL,delivery_error=NULL WHERE id=$1 AND delivery_status='sending'",[job.id,providerId]);
+      await this.db.query("UPDATE messages m SET delivery_status=r.status,delivery_error=CASE WHEN r.status='failed' THEN COALESCE(r.details->>'failureReason','SMS provider reported delivery failure') ELSE NULL END FROM sms_delivery_reports r WHERE m.id=$1 AND r.agency_id=m.agency_id AND r.connection_id=$3 AND r.provider_message_id=$2 AND r.status IN ('delivered','failed')",[job.id,providerId,job.connectionId]);
       await this.quota.consume(job.agencyId,key);
     }catch(error){await this.fail(job,error instanceof Error?error.message:'Unknown SMS provider error',false);}
   }
