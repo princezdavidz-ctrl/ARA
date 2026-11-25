@@ -17,6 +17,15 @@ const channels = [
     tint: 'from-sky-400 to-blue-600',
   },
   {
+    name: 'SMS',
+    desc: 'Two-way text messaging with AI replies, delivery tracking and STOP/START/HELP opt-out controls.',
+    iconSrc: 'https://img.icons8.com/color/48/sms.png',
+    iconAlt: 'SMS messaging icon',
+    iconCredit: 'https://icons8.com/icons/set/sms',
+    tint: 'from-cyan-400 to-blue-600',
+    badge: 'New',
+  },
+  {
     name: 'Instagram',
     desc: 'Direct messages through the Meta Messaging API, with attachments escalated to humans.',
     iconSrc: 'https://img.icons8.com/color/48/instagram-new--v1.png',
@@ -51,7 +60,7 @@ export default function Channels() {
           </p>
         </div>
 
-        <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {channels.map((c) => (
             <div
               key={c.name}
