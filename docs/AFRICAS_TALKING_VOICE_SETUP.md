@@ -46,7 +46,7 @@ The configured transfer number is a single company destination, not yet an avail
 - Request and activate a regular voice-enabled number in the Africa's Talking dashboard; the provider may require an application review, agreement and invoice before allocating the number.
 - Configure the callback and events URLs for the allocated number.
 - Start with sandbox credentials and test inbound and outbound call lifecycle events before any production calls.
-- Check current Kenyan number fees, per-minute rates, concurrency and account balance with Africa's Talking before setting customer prices. Provider wallet balance can affect service availability.
+- Check current Kenyan number fees, per-minute rates, concurrency and account balance with Africa's Talking before setting customer prices. Provider wallet balance can affect service availability. The provider's current guidance recommends up to 40 simultaneous calls and one call initiation per second; ARA applies these as per-connection guardrails for outbound calls.
 - Africa's Talking's help material says call recordings remain on its dashboard for 48 hours. If recording is enabled in a later release, ARA must download and store recordings securely within the provider's retention window, with lawful consent, role-based access and a defined deletion policy.
 
 ## API and provider references
