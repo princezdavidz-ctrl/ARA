@@ -204,7 +204,7 @@ async function settings(){
     return;
   }
   companyProfile=companyProfile||await api('/platform/brand-profile');
-  var p=companyProfile||{},layout=p.layoutSettings||{},hours=p.aiWorkingHours||{},days=hours.days||{},nav=['overview','inbox','handoff','approvals','channels','api-keys','knowledge','billing','ai-usage','team'];
+  var p=companyProfile||{},layout=p.layoutSettings||{},hours=p.aiWorkingHours||{},days=hours.days||{},nav=['overview','inbox','customers','handoff','approvals','channels','voice-calls','api-keys','knowledge','billing','ai-usage','team'];
   var dayNames={mon:'Monday',tue:'Tuesday',wed:'Wednesday',thu:'Thursday',fri:'Friday',sat:'Saturday',sun:'Sunday'};
   var dayRows=Object.keys(dayNames).map(function(k){var d=days[k]||{};return '<div class="hours-row"><label><input type="checkbox" name="day-'+k+'" '+(d.enabled?'checked':'')+'> '+dayNames[k]+'</label><label>From <input type="time" name="start-'+k+'" value="'+esc(d.start||'09:00')+'"></label><label>To <input type="time" name="end-'+k+'" value="'+esc(d.end||'17:00')+'"></label></div>';}).join('');
   var navRows=nav.map(function(k){var selected=!Array.isArray(layout.navItems)||!layout.navItems.length||layout.navItems.includes(k);return '<label class="nav-setting"><input type="checkbox" name="nav-'+k+'" '+(selected?'checked':'')+'> '+k.replace(/-/g,' ')+'</label>';}).join('');
