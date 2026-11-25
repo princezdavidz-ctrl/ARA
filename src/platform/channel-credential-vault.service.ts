@@ -2,7 +2,7 @@ import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { createDecipheriv, createHash } from 'node:crypto';
 import { DatabaseService } from '../database/database.service';
 
-export type ChannelProvider='whatsapp'|'email'|'instagram'|'facebook_messenger'|'tiktok'|'africas_talking_sms';
+export type ChannelProvider='whatsapp'|'email'|'instagram'|'facebook_messenger'|'tiktok'|'africas_talking_sms'|'africas_talking_voice';
 export type ResolvedChannel={id:string;agencyId:string;provider:ChannelProvider;externalAccountId:string;externalPhoneNumberId:string|null;credentials:Record<string,string>;keyVersion:string;webhookVerified?:boolean};
 
 @Injectable()
