@@ -43,6 +43,7 @@ export class AfricaTalkingVoiceService {
     if(!connection||connection.provider!=='africas_talking_voice')throw new BadRequestException('An active Africa\'s Talking Voice connection is required.');
     const {username,apiKey,environment,transferNumber}=connection.credentials;
     if(!username||!apiKey||!this.validPhone(transferNumber))throw new BadRequestException('Voice connection credentials or agent transfer number are incomplete.');
+    if(to===connection.externalAccountId||to===transferNumber)throw new BadRequestException('Destination must be different from the ARA voice number and agent transfer number.');
     const clientRequestId=randomUUID();
     const created=await this.db.transaction(async client=>{
       const recent=await client.query('SELECT id FROM voice_calls WHERE connection_id=$1 AND direction=\'outbound\' AND created_at>now()-interval \'1 second\' LIMIT 1',[connection.id]);
