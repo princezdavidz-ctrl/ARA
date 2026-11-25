@@ -174,7 +174,7 @@ function renderShell(){
   document.getElementById('identity').textContent=(user?user.fullName+' · '+user.role:'');
   api('/platform/brand-profile').then(applyCompanyBrand).catch(function(){});
 
-  if(!['owner','admin'].includes(user&&user.role)){document.querySelector('[data-page="settings"]').hidden=true;var settingsOption=document.querySelector('#mobile-page option[value="settings"]');if(settingsOption)settingsOption.hidden=true;document.querySelector('[data-page="api-keys"]').hidden=true;var apiKeysOption=document.querySelector('#mobile-page option[value="api-keys"]');if(apiKeysOption)apiKeysOption.hidden=true;document.querySelector('[data-page="billing"]').hidden=true;var billingOption=document.querySelector('#mobile-page option[value="billing"]');if(billingOption)billingOption.hidden=true;}
+  if(!['owner','admin'].includes(user&&user.role)){document.querySelector('[data-page="api-keys"]').hidden=true;var apiKeysOption=document.querySelector('#mobile-page option[value="api-keys"]');if(apiKeysOption)apiKeysOption.hidden=true;document.querySelector('[data-page="billing"]').hidden=true;var billingOption=document.querySelector('#mobile-page option[value="billing"]');if(billingOption)billingOption.hidden=true;}
   if(!['owner','admin','manager'].includes(user&&user.role)){document.querySelector('[data-page="approvals"]').hidden=true;var approvalsOption=document.querySelector('#mobile-page option[value="approvals"]');if(approvalsOption)approvalsOption.hidden=true;document.querySelector('[data-page="team"]').hidden=true;var teamOption=document.querySelector('#mobile-page option[value="team"]');if(teamOption)teamOption.hidden=true;}
   app.querySelectorAll('[data-page]').forEach(function(button){button.addEventListener('click',function(){page=button.dataset.page;loadPage();});});var mobilePage=document.getElementById('mobile-page');if(mobilePage){mobilePage.value=page;mobilePage.onchange=function(){page=mobilePage.value;loadPage();};}
   document.getElementById('logout').addEventListener('click',logout);
@@ -189,7 +189,12 @@ function table(headers,rows){return '<div class="panel table-wrap"><table class=
 
 async function settings(){
   pageTitle('Workspace settings','Customize your company brand, interface, language and AI communication hours');
-  if(!user||!['owner','admin'].includes(user.role)){document.getElementById('content').innerHTML='<div class="notice">Only company owners and administrators can change workspace settings.</div>';return;}
+  if(!user||!['owner','admin'].includes(user.role)){
+    var lang=localStorage.getItem('ara_ui_language')||'en';
+    document.getElementById('content').innerHTML='<section class="panel"><div class="section-head"><h2>Your interface language</h2></div><form id="personal-language-form" class="form-grid"><label class="field">Choose your language<select name="uiLanguage"><option value="en" '+(lang==='en'?'selected':'')+'>English</option><option value="sw" '+(lang==='sw'?'selected':'')+'>Kiswahili</option></select></label><div class="wide"><button type="submit">Save language preference</button><p id="personal-language-status" class="subtle" role="status"></p></div></form></section>';
+    document.getElementById('personal-language-form').onsubmit=async function(e){e.preventDefault();var value=new FormData(e.currentTarget).get('uiLanguage'),status=document.getElementById('personal-language-status');try{await api('/platform/preferences',{method:'POST',body:JSON.stringify({uiLanguage:value})});localStorage.setItem('ara_ui_language',value);status.textContent='Language preference saved.';}catch(err){status.textContent=err.message;}};
+    return;
+  }
   companyProfile=companyProfile||await api('/platform/brand-profile');
   var p=companyProfile||{},layout=p.layoutSettings||{},hours=p.aiWorkingHours||{},days=hours.days||{},nav=['overview','inbox','handoff','approvals','channels','api-keys','knowledge','billing','ai-usage','team'];
   var dayNames={mon:'Monday',tue:'Tuesday',wed:'Wednesday',thu:'Thursday',fri:'Friday',sat:'Saturday',sun:'Sunday'};
@@ -215,7 +220,7 @@ async function settings(){
       var navOrder=String(f.get('navOrder')||'').split(',').map(function(x){return x.trim();}).filter(function(x){return nav.includes(x)&&f.get('nav-'+x)!==null;});
       var daySchedule={};Object.keys(dayNames).forEach(function(k){daySchedule[k]={enabled:!!f.get('day-'+k),start:f.get('start-'+k)||'09:00',end:f.get('end-'+k)||'17:00'};});
       var body={companyName:f.get('companyName'),primaryColor:f.get('primaryColor'),accentColor:f.get('accentColor'),backgroundColor:f.get('backgroundColor'),surfaceColor:f.get('surfaceColor'),textColor:f.get('textColor'),sidebarColor:f.get('sidebarColor'),navbarColor:f.get('navbarColor'),logoDataUrl:logo,backgroundImageDataUrl:background,removeLogo:!!f.get('removeLogo'),removeBackgroundImage:!!f.get('removeBackgroundImage'),uiLanguage:f.get('uiLanguage'),aiReplyLanguage:f.get('aiReplyLanguage'),timezone:f.get('timezone'),aiWorkingHours:{enabled:!!f.get('hoursEnabled'),days:daySchedule},aiAfterHoursAction:f.get('afterHoursAction'),aiAfterHoursMessage:f.get('afterHoursMessage'),layoutSettings:{sidebarWidth:Number(f.get('sidebarWidth')),sidebarPosition:f.get('sidebarPosition'),navbarStyle:f.get('navbarStyle'),dashboardLayout:f.get('dashboardLayout'),navItems:navOrder}};
-      companyProfile=await api('/platform/brand-profile',{method:'POST',body:JSON.stringify(body)});
+      await api('/platform/preferences',{method:'POST',body:JSON.stringify({uiLanguage:body.uiLanguage})});companyProfile=await api('/platform/brand-profile',{method:'POST',body:JSON.stringify(body)});
       localStorage.setItem('ara_ui_language',String(body.uiLanguage));applyCompanyBrand(companyProfile);status.textContent='Settings saved successfully.';await settings();
     }catch(err){status.textContent=err.message||'Could not save settings.';}finally{button.disabled=false;}
   };
