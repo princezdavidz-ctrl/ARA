@@ -70,7 +70,6 @@ export class AfricaTalkingVoiceService {
   }
 
   async listCalls(user:AraUser){
-    this.requireVoiceManager(user);
     const r=await this.db.query("SELECT id,conversation_id AS \"conversationId\",direction,caller_number AS \"callerNumber\",destination_number AS \"destinationNumber\",status,duration_seconds AS \"durationSeconds\",provider_cost AS \"providerCost\",currency_code AS \"currencyCode\",recording_enabled AS \"recordingEnabled\",recording_url IS NOT NULL AS \"recordingAvailable\",started_at AS \"startedAt\",answered_at AS \"answeredAt\",ended_at AS \"endedAt\",created_at AS \"createdAt\" FROM voice_calls WHERE agency_id=$1 ORDER BY created_at DESC LIMIT 100",[user.agencyId]);
     return {items:r.rows};
   }
