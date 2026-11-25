@@ -95,7 +95,7 @@ export class ChannelConnectionsService {
         if(!updated.rowCount) throw new NotFoundException('Channel connection not found');
         await client.query('INSERT INTO audit_logs(agency_id,actor_user_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5,$6)',
           [user.agencyId,user.id,'channel.connection_activated','channel_connection',id,JSON.stringify({provider:connection.provider,verificationMethod:'credential_presence'})]);
-        return {connection:updated.rows[0],message:'Required credentials are present and the connection is active. Confirm provider webhook relay configuration and test a real inbound and outbound message.'};
+        return {connection:updated.rows[0],message:'Required credentials are present and the connection is active. Confirm provider callback configuration and test a real inbound and outbound interaction.'};
       });
     }
     if(!['whatsapp','instagram'].includes(connection.provider)) throw new BadRequestException('Unsupported channel provider');
