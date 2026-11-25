@@ -91,7 +91,7 @@ export class PlatformService implements OnApplicationBootstrap {
     this.requireRole(u,['owner','admin']);
     const name=String(b?.companyName||'').trim();
     const colors:{[key:string]:string}={primaryColor:String(b?.primaryColor||'').toUpperCase(),accentColor:String(b?.accentColor||'').toUpperCase(),backgroundColor:String(b?.backgroundColor||'#070B14').toUpperCase(),surfaceColor:String(b?.surfaceColor||'#0B1220').toUpperCase(),textColor:String(b?.textColor||'#E9EEF5').toUpperCase(),sidebarColor:String(b?.sidebarColor||'#0C1728').toUpperCase(),navbarColor:String(b?.navbarColor||'#0B1220').toUpperCase()};
-    const logo=String(b?.logoDataUrl||''),background=String(b?.backgroundImageDataUrl||''),imagePattern=/^data:image\\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
+    const logo=String(b?.logoDataUrl||''),background=String(b?.backgroundImageDataUrl||''),imagePattern=/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
     if(name.length<2||name.length>120)throw new BadRequestException('Company name must be 2–120 characters.');
     if(Object.values(colors).some(v=>!/^#[0-9A-F]{6}$/.test(v)))throw new BadRequestException('All theme colours must be valid six-digit hex colours.');
     if(logo&&(!imagePattern.test(logo)||logo.length>1400000))throw new BadRequestException('Logo must be PNG, JPEG or WebP and smaller than 1 MB.');
@@ -103,7 +103,7 @@ export class PlatformService implements OnApplicationBootstrap {
     const hours=b?.aiWorkingHours&&typeof b.aiWorkingHours==='object'?b.aiWorkingHours:{enabled:false,days:{}};
     if(typeof hours.enabled!=='boolean')throw new BadRequestException('AI working-hours enabled must be true or false.');
     const dayKeys=['mon','tue','wed','thu','fri','sat','sun'];
-    for(const day of dayKeys){const slot=hours.days?.[day];if(slot&&(typeof slot.enabled!=='boolean'||!/^([01]\\d|2[0-3]):[0-5]\\d$/.test(String(slot.start))||!/^([01]\\d|2[0-3]):[0-5]\\d$/.test(String(slot.end))))throw new BadRequestException('Working hours must use valid 24-hour times.');}
+    for(const day of dayKeys){const slot=hours.days?.[day];if(slot&&(typeof slot.enabled!=='boolean'||!/^([01]\d|2[0-3]):[0-5]\d$/.test(String(slot.start))||!/^([01]\d|2[0-3]):[0-5]\d$/.test(String(slot.end))))throw new BadRequestException('Working hours must use valid 24-hour times.');}
     const action=String(b?.aiAfterHoursAction||'message'),afterHoursMessage=String(b?.aiAfterHoursMessage||'').trim();
     if(!['message','handoff'].includes(action))throw new BadRequestException('Choose a valid after-hours action.');
     if(afterHoursMessage.length<2||afterHoursMessage.length>500)throw new BadRequestException('After-hours message must be 2–500 characters.');
