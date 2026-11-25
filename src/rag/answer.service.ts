@@ -65,7 +65,8 @@ export class AnswerService {
   }
 
   async answer(x:AnswerInput,agencyId:string,executionContext:Partial<Pick<AiExecutionContext,'channel'|'conversationId'|'messageId'>>={}){
-    const settingsResult=await this.db.query<any>(`SELECT cs.industry,cs.display_name,cs.default_language,
+    const settingsResult=await this.db.query<any>(`SELECT cs.industry,cs.display_name,cs.default_language,cs.ai_reply_language,
+        cs.timezone,cs.ai_working_hours,cs.ai_after_hours_action,cs.ai_after_hours_message,
         ai.agent_name,ai.system_instructions,ai.response_mode,ai.confidence_threshold,
         ai.escalate_sensitive_topics,ai.enabled
       FROM company_settings cs
@@ -80,7 +81,25 @@ export class AnswerService {
     const threshold=Number(settings.confidence_threshold??0.72);
     const enabled=settings.enabled!==false;
     const escalateSensitive=settings.escalate_sensitive_topics!==false;
-    const lang=x.preferredLanguage==='auto'?(settings.default_language==='sw'?'sw':'en'):x.preferredLanguage;
+    const configuredReplyLanguage=String(settings.ai_reply_language||'customer');
+    const lang=configuredReplyLanguage==='customer'?(x.preferredLanguage==='auto'?(settings.default_language==='sw'?'sw':'en'):x.preferredLanguage):(configuredReplyLanguage==='sw'?'sw':'en');
+    const hours=settings.ai_working_hours||{enabled:false};
+    if(hours.enabled===true){
+      const timezone=String(settings.timezone||'Africa/Nairobi');
+      const nowParts=new Intl.DateTimeFormat('en-US',{timeZone:timezone,weekday:'short',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date());
+      const part=(type:string)=>nowParts.find((p:any)=>p.type===type)?.value||'';
+      const dayMap:{[key:string]:string}={Mon:'mon',Tue:'tue',Wed:'wed',Thu:'thu',Fri:'fri',Sat:'sat',Sun:'sun'};
+      const day=dayMap[part('weekday')],slot=hours.days?.[day];
+      const current=Number(part('hour'))*60+Number(part('minute'));
+      const start=String(slot?.start||'09:00').split(':').reduce((h:string,m:string)=>Number(h)*60+Number(m),0);
+      const end=String(slot?.end||'17:00').split(':').reduce((h:string,m:string)=>Number(h)*60+Number(m),0);
+      const isOpen=!!slot?.enabled&&current>=start&&current<end;
+      if(!isOpen){
+        const message=String(settings.ai_after_hours_message||'Thank you for contacting us. Our AI communication hours have ended. We will respond when service resumes.');
+        const handoff=settings.ai_after_hours_action==='handoff';
+        return {answer:message,language:lang,status:handoff?'needs_human' as const:'answered' as const,responseMode,confidence:'high' as const,citations:[],escalationReason:handoff?'AI communication is outside configured working hours.':null};
+      }
+    }
 
     if(!enabled)return{
       answer:lang==='sw'?'Msaidizi wa AI wa kampuni hii amezimwa. Ombi lako limepelekwa kwa mfanyakazi.':'The company AI assistant is disabled. This request has been sent for staff review.',
