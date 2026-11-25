@@ -59,6 +59,7 @@ export class ChannelConnectionsService {
     let externalAccountId=String(body?.externalAccountId||'').trim();
     if(provider==='email') externalAccountId=externalAccountId.toLowerCase();
     if(provider==='africas_talking_sms'&&!/^[A-Za-z0-9_-]{2,20}$/.test(externalAccountId)) throw new BadRequestException('Africa\'s Talking sender ID or shortcode is invalid');
+    if(provider==='africas_talking_voice'&&!/^\+?[1-9]\d{7,14}$/.test(externalAccountId)) throw new BadRequestException('Africa\'s Talking voice number must be in international E.164 format');
     const phone=body?.externalPhoneNumberId==null?null:String(body.externalPhoneNumberId).trim();
     const credentials=this.safeCredentials(body?.credentials);
     if (!providers.includes(provider)||displayName.length<2||displayName.length>120||!externalAccountId||externalAccountId.length>255||(phone&&phone.length>255)) {
@@ -82,11 +83,12 @@ export class ChannelConnectionsService {
     const connection=await this.vault.getForTenantConnection(user.agencyId,id);
     if(!connection) throw new NotFoundException('Channel connection not found');
     if(connection.provider==='email'||connection.provider==='tiktok'||connection.provider==='africas_talking_sms'||connection.provider==='africas_talking_voice'){
-      const required=connection.provider==='email'?['webhookSecret','apiKey','fromAddress']:connection.provider==='tiktok'?['webhookSecret','accessToken']:['username','apiKey','webhookVerifyToken','environment'];
+      const required=connection.provider==='email'?['webhookSecret','apiKey','fromAddress']:connection.provider==='tiktok'?['webhookSecret','accessToken']:connection.provider==='africas_talking_sms'?['username','apiKey','webhookVerifyToken','environment']:['username','apiKey','webhookVerifyToken','environment','transferNumber'];
       const missing=required.filter(key=>!connection.credentials[key]?.trim());
       if(missing.length) throw new BadRequestException('Missing required encrypted credentials: '+missing.join(', '));
       if((connection.provider==='africas_talking_sms'||connection.provider==='africas_talking_voice')&&!['sandbox','production'].includes(connection.credentials.environment)) throw new BadRequestException('Africa\'s Talking environment must be sandbox or production');
       if((connection.provider==='africas_talking_sms'||connection.provider==='africas_talking_voice')&&connection.credentials.webhookVerifyToken.length<32) throw new BadRequestException('Africa\'s Talking webhookVerifyToken must be at least 32 characters');
+      if(connection.provider==='africas_talking_voice'&&!/^\+?[1-9]\d{7,14}$/.test(connection.credentials.transferNumber)) throw new BadRequestException('Africa\'s Talking transferNumber must be in international E.164 format');
       if(connection.provider==='email'&&!/^\S+@\S+\.\S+$/.test(connection.credentials.fromAddress)) throw new BadRequestException('Email fromAddress must be a valid verified sender address');
       return this.db.transaction(async client=>{
         const updated=await client.query<ConnectionRow>('UPDATE channel_connections SET status=\'active\',last_verified_at=now(),last_error_code=NULL,updated_at=now() WHERE agency_id=$1 AND id=$2 RETURNING '+this.projection(),[user.agencyId,id]);
