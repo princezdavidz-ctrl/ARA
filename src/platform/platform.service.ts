@@ -118,6 +118,8 @@ export class PlatformService implements OnApplicationBootstrap {
     });
     return this.brandProfile(u);
   }
+  async updatePreferences(u:User,b:any){const uiLanguage=String(b?.uiLanguage||'en');if(!['en','sw'].includes(uiLanguage))throw new BadRequestException('Choose English or Kiswahili.');await this.db.query('UPDATE agency_users SET ui_language=$2 WHERE id=$1 AND agency_id=$3',[u.id,uiLanguage,u.agencyId]);return {uiLanguage};}
+
   async resetOwnerPassword(body:any){
     const supplied=String(body?.setupToken||'');
     const configured=String(process.env.OWNER_PASSWORD_RESET_TOKEN||'');
