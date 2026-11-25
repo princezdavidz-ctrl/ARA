@@ -200,7 +200,7 @@ async function settings(){
   if(!user||!['owner','admin'].includes(user.role)){
     var lang=localStorage.getItem('ara_ui_language')||'en';
     document.getElementById('content').innerHTML='<section class="panel"><div class="section-head"><h2>Your interface language</h2></div><form id="personal-language-form" class="form-grid"><label class="field">Choose your language<select name="uiLanguage"><option value="en" '+(lang==='en'?'selected':'')+'>English</option><option value="sw" '+(lang==='sw'?'selected':'')+'>Kiswahili</option></select></label><div class="wide"><button type="submit">Save language preference</button><p id="personal-language-status" class="subtle" role="status"></p></div></form></section>';
-    document.getElementById('personal-language-form').onsubmit=async function(e){e.preventDefault();var value=new FormData(e.currentTarget).get('uiLanguage'),status=document.getElementById('personal-language-status');try{await api('/platform/preferences',{method:'POST',body:JSON.stringify({uiLanguage:value})});localStorage.setItem('ara_ui_language',value);status.textContent='Language preference saved.';}catch(err){status.textContent=err.message;}};
+    document.getElementById('personal-language-form').onsubmit=async function(e){e.preventDefault();var value=new FormData(e.currentTarget).get('uiLanguage'),status=document.getElementById('personal-language-status');try{await api('/platform/preferences',{method:'POST',body:JSON.stringify({uiLanguage:value})});localStorage.setItem('ara_ui_language',value);applyUiLanguage(value);status.textContent='Language preference saved.';}catch(err){status.textContent=err.message;}};
     return;
   }
   companyProfile=companyProfile||await api('/platform/brand-profile');
