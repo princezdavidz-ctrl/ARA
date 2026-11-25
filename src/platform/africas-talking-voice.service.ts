@@ -11,7 +11,7 @@ export class AfricaTalkingVoiceService {
   constructor(private readonly db:DatabaseService,private readonly vault:ChannelCredentialVault){}
 
   private requireVoiceManager(user:AraUser){if(!['owner','admin','manager'].includes(user.role))throw new ForbiddenException('Only company managers can initiate or view voice calls.');}
-  private validPhone(value:string){return /^\\+?[1-9]\\d{7,14}$/.test(value);}
+  private validPhone(value:string){return /^\\+[1-9]\\d{7,14}$/.test(value);}
   private async connectionForToken(token:string):Promise<ResolvedChannel>{
     if(!token||token.length<32)throw new UnauthorizedException('Invalid voice webhook token');
     const connection=await this.vault.findByVerifyToken('africas_talking_voice',token,true);
@@ -47,7 +47,7 @@ export class AfricaTalkingVoiceService {
     const created=await this.db.transaction(async client=>{
       const conversation=await client.query("INSERT INTO conversations(agency_id,channel,channel_connection_id,customer_contact) VALUES($1,'phone',$2,$3) RETURNING id",[user.agencyId,connection.id,to]);
       const call=await client.query("INSERT INTO voice_calls(agency_id,connection_id,conversation_id,direction,client_request_id,caller_number,destination_number,status,metadata) VALUES($1,$2,$3,'outbound',$4,$5,$6,'queued',$7::jsonb) RETURNING id,client_request_id AS \"clientRequestId\",conversation_id AS \"conversationId\"",
-        [user.agencyId,connection.id,conversation.rows[0].id,clientRequestId,connection.externalAccountId,to,JSON.stringify({initiatedBy:user.id,transferNumber})]);
+        [user.agencyId,connection.id,conversation.rows[0].id,clientRequestId,connection.externalAccountId,to,JSON.stringify({initiatedBy:user.id})]);
       await client.query("INSERT INTO audit_logs(agency_id,actor_user_id,action,target_type,target_id,details) VALUES($1,$2,'voice.call_initiated','voice_call',$3,$4::jsonb)",[user.agencyId,user.id,call.rows[0].id,JSON.stringify({direction:'outbound',destination:to})]);
       return call.rows[0];
     });
