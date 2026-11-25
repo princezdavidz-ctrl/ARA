@@ -89,7 +89,7 @@ export class AfricaTalkingVoiceService {
     const isActive=String(body?.isActive||'0')==='1';
     if(!sessionId||!caller||!destination||!this.validPhone(caller)||!this.validPhone(destination))throw new BadRequestException('Incomplete voice callback payload.');
     if(direction==='inbound'&&destination!==connection.externalAccountId)throw new UnauthorizedException('Inbound call destination does not match this voice connection.');
-    const result=await this.db.transaction(async client=>{
+    await this.db.transaction(async client=>{
       let call=await client.query<VoiceCallRow>("SELECT id,agency_id AS \"agencyId\",connection_id AS \"connectionId\",conversation_id AS \"conversationId\",provider_session_id AS \"providerSessionId\",client_request_id AS \"clientRequestId\",direction,caller_number AS \"callerNumber\",destination_number AS \"destinationNumber\",status FROM voice_calls WHERE agency_id=$1 AND connection_id=$2 AND (provider_session_id=$3 OR ($4<>'' AND client_request_id=$4)) ORDER BY created_at DESC LIMIT 1 FOR UPDATE",[connection.agencyId,connection.id,sessionId,clientRequestId]);
       let existing=call.rows[0];
       if(!existing){
