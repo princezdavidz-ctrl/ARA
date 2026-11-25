@@ -36,7 +36,7 @@ describe('ChannelConnectionsService', () => {
 
   it.each([
     ['email',{webhookSecret:'relay-secret',apiKey:'resend-key',fromAddress:'support@example.test'}],
-    ['tiktok',{webhookSecret:'relay-secret',accessToken:'tiktok-token'}],
+    ['tiktok',{webhookSecret:'relay-secret',accessToken:'tiktok-token'}],\n    ['africas_talking_sms',{username:'ara-sandbox',apiKey:'provider-api-key',webhookVerifyToken:'a-unique-random-webhook-token-long-enough',environment:'sandbox'}],
   ])('activates a %s connection after required tenant credentials are present',async(provider,credentials)=>{
     const saved:any={id:'33333333-3333-4333-8333-333333333333',provider,displayName:'Tenant channel',externalAccountId:provider==='email'?'support@example.test':'business-1',externalPhoneNumberId:null,status:'active',scopes:[],lastVerifiedAt:new Date().toISOString(),lastErrorCode:null,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
     const client:any={query:jest.fn(async(sql:string)=>sql.startsWith('UPDATE channel_connections')?{rows:[saved],rowCount:1}:{rows:[],rowCount:1})};
