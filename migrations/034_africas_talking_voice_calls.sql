@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS voice_calls (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   FOREIGN KEY (agency_id,connection_id) REFERENCES channel_connections(agency_id,id) ON DELETE CASCADE,
-  FOREIGN KEY (agency_id,conversation_id) REFERENCES conversations(agency_id,id) ON DELETE CASCADE,
+  FOREIGN KEY (conversation_id,agency_id) REFERENCES conversations(id,agency_id) ON DELETE CASCADE,
   UNIQUE (agency_id,id),
   UNIQUE (agency_id,client_request_id)
 );
