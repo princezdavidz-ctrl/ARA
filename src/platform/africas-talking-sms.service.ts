@@ -1,5 +1,4 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit, UnauthorizedException } from '@nestjs/common';
-import { ConfigService } from '../config/config.service';
 import { DatabaseService } from '../database/database.service';
 import { ChannelCredentialVault } from './channel-credential-vault.service';
 import { MessageUsageQuotaService } from './message-usage-quota.service';
@@ -10,7 +9,7 @@ export class AfricaTalkingSmsService implements OnModuleInit,OnModuleDestroy {
   private readonly logger=new Logger(AfricaTalkingSmsService.name);
   private timer:ReturnType<typeof setInterval>|undefined;
   private running=false;
-  constructor(private readonly db:DatabaseService,private readonly vault:ChannelCredentialVault,private readonly quota:MessageUsageQuotaService,private readonly config:ConfigService){}
+  constructor(private readonly db:DatabaseService,private readonly vault:ChannelCredentialVault,private readonly quota:MessageUsageQuotaService){}
   onModuleInit(){this.timer=setInterval(()=>void this.tick(),2000);void this.tick();}
   onModuleDestroy(){if(this.timer)clearInterval(this.timer);}
 
