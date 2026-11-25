@@ -3,7 +3,7 @@ import { DatabaseService } from '../database/database.service';
 import { ChannelCredentialVault } from './channel-credential-vault.service';
 import { MessageUsageQuotaService } from './message-usage-quota.service';
 
-type SmsJob={id:string;agencyId:string;conversationId:string;recipient:string;body:string;connectionId:string;attempts:number};
+type SmsJob={id:string;agencyId:string;conversationId:string;recipient:string;body:string;connectionId:string;senderType:string;attempts:number};
 @Injectable()
 export class AfricaTalkingSmsService implements OnModuleInit,OnModuleDestroy {
   private readonly logger=new Logger(AfricaTalkingSmsService.name);
@@ -80,8 +80,11 @@ export class AfricaTalkingSmsService implements OnModuleInit,OnModuleDestroy {
   }
   private async deliver(job:SmsJob){
     const key='message-out:'+job.id;
-    const reservation=await this.quota.reserve(job.agencyId,'message_out',key);
-    if(!reservation.allowed){await this.db.query("UPDATE messages SET delivery_status='failed',delivery_started_at=NULL,delivery_error=$2 WHERE id=$1 AND delivery_status='sending'",[job.id,(reservation.reason||'SMS allowance exhausted').slice(0,1000)]);return;}
+    const systemAcknowledgement=job.senderType==='system';
+    if(!systemAcknowledgement){
+      const reservation=await this.quota.reserve(job.agencyId,'message_out',key);
+      if(!reservation.allowed){await this.db.query("UPDATE messages SET delivery_status='failed',delivery_started_at=NULL,delivery_error=$2 WHERE id=$1 AND delivery_status='sending'",[job.id,(reservation.reason||'SMS allowance exhausted').slice(0,1000)]);return;}
+    }
     const connection=await this.vault.getForTenantConnection(job.agencyId,job.connectionId,true);
     if(!connection){await this.fail(job,'SMS channel connection is no longer active.',true);return;}
     const username=connection.credentials.username,apiKey=connection.credentials.apiKey,environment=connection.credentials.environment;
@@ -102,7 +105,7 @@ export class AfricaTalkingSmsService implements OnModuleInit,OnModuleDestroy {
       }
       await this.db.query("UPDATE messages SET delivery_status='sent',provider_message_id=$2,delivery_started_at=NULL,delivery_next_attempt_at=NULL,delivery_error=NULL WHERE id=$1 AND delivery_status='sending'",[job.id,providerId]);
       await this.db.query("UPDATE messages m SET delivery_status=r.status,delivery_error=CASE WHEN r.status='failed' THEN COALESCE(r.details->>'failureReason','SMS provider reported delivery failure') ELSE NULL END FROM sms_delivery_reports r WHERE m.id=$1 AND r.agency_id=m.agency_id AND r.connection_id=$3 AND r.provider_message_id=$2 AND r.status IN ('delivered','failed')",[job.id,providerId,job.connectionId]);
-      await this.quota.consume(job.agencyId,key);
+      if(systemAcknowledgement){await this.db.query("INSERT INTO usage_records(agency_id,subscription_id,metric,quantity,idempotency_key,metadata) VALUES($1,(SELECT id FROM company_subscriptions WHERE agency_id=$1 AND status IN ('active','trialing','past_due') AND current_period_start<=now() AND current_period_end>now() ORDER BY created_at DESC LIMIT 1),'message_out',1,$2,'{\\\"reason\\\":\\\"sms_keyword_acknowledgement\\\",\\\"provider\\\":\\\"africas_talking\\\"}'::jsonb) ON CONFLICT(agency_id,idempotency_key) DO NOTHING",[job.agencyId,key]);}else{await this.quota.consume(job.agencyId,key);}
     }catch(error){await this.fail(job,error instanceof Error?error.message:'Unknown SMS provider error',false);}
   }
   private async fail(job:SmsJob,reason:string,permanent:boolean){
