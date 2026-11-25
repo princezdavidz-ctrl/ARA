@@ -136,3 +136,7 @@ Build the abstraction first. Evaluate Africa's Talking, Twilio and relevant coun
 5. Continue Customer 360, campaigns, automation, contact-center, analytics/mobile and developer platform phases.
 
 The architecture is approved; provider-specific production integration remains gated on vendor selection, account provisioning and credentials configured securely by an authorized administrator.
+
+
+## Kenya-first SMS adapter decision
+Use Africa's Talking as the first provider adapter for two-way SMS in Kenya. Its published support information lists two-way SMS in Kenya; Twilio's Kenya SMS guidelines currently list two-way SMS as unsupported. Keep the adapter interface provider-neutral so other markets can add different providers. See `docs/AFRICAS_TALKING_SMS_SETUP.md` for tenant connection fields, callback URLs and sandbox-to-production checklist.

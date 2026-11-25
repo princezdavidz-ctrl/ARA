@@ -27,9 +27,11 @@ import { InstagramWebhookController } from './platform/instagram-webhook.control
 import { InstagramWebhookService } from './platform/instagram-webhook.service';
 import { TikTokWebhookController } from './platform/tiktok-webhook.controller';
 import { TikTokWebhookService } from './platform/tiktok-webhook.service';
+import { AfricaTalkingSmsWebhookController } from './platform/africas-talking-sms-webhook.controller';
+import { AfricaTalkingSmsService } from './platform/africas-talking-sms.service';
 @Module({
   imports: [PlatformModule],
-  controllers: [HealthController, PublicAssistantController, KnowledgeController, AnswerController, WhatsAppWebhookController, EmailWebhookController, InstagramWebhookController, TikTokWebhookController, PropertyController, DashboardController],
-  providers: [ConfigService, DatabaseService, OpenAiService, LocalLlmService, AiOrchestratorService, IngestionService, RetrievalService, EmbeddingUsageService, AiUsageQuotaService, MessageUsageQuotaService, AnswerService, MessageWorker, WhatsAppWebhookService, EmailWebhookService, InstagramWebhookService, TikTokWebhookService, PropertyService],
+  controllers: [HealthController, PublicAssistantController, KnowledgeController, AnswerController, WhatsAppWebhookController, EmailWebhookController, InstagramWebhookController, TikTokWebhookController, AfricaTalkingSmsWebhookController, PropertyController, DashboardController],
+  providers: [ConfigService, DatabaseService, OpenAiService, LocalLlmService, AiOrchestratorService, IngestionService, RetrievalService, EmbeddingUsageService, AiUsageQuotaService, MessageUsageQuotaService, AnswerService, MessageWorker, WhatsAppWebhookService, EmailWebhookService, InstagramWebhookService, TikTokWebhookService, AfricaTalkingSmsService, PropertyService],
 })
 export class AppModule {}

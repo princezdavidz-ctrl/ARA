@@ -68,3 +68,20 @@ TikTok inbound messages are accepted at /webhooks/tiktok and normalized from DIR
 Migration 016 adds checkout/merchant request references for Safaricom STK Push. Configure the API runtime with `MPESA_ENV=sandbox`, `MPESA_CONSUMER_KEY`, `MPESA_CONSUMER_SECRET`, `MPESA_PASSKEY`, `MPESA_SHORT_CODE`, and a publicly reachable HTTPS `MPESA_CALLBACK_URL` pointing to `/webhooks/mpesa/stk`. Keep these values in the backend secret manager only; never add them to either frontend's `config.js` or commit real values to Git. The provided sandbox shortcode is configured as `174379` in the secret store, not in source code.
 
 Company owners/admins can initiate STK Push for an open KES invoice using `POST /platform/billing/invoices/:id/mpesa` with `{ "phoneNumber": "07XXXXXXXX" }`. The backend normalizes Kenyan phone numbers, validates invoice ownership and amount, requests the STK prompt, and stores the checkout reference. Safaricom posts the result to `POST /webhooks/mpesa/stk`; the callback is matched to the stored checkout and merchant request IDs, phone and exact invoice amount before a payment is marked successful. Duplicate callbacks are idempotently acknowledged. STK Push amounts must be whole KES. Use sandbox test MSISDNs and the Daraja sandbox simulator; sandbox payments do not move real money. Configure a valid public HTTPS callback before testing. The production environment must use separately issued production credentials and the production Daraja endpoint.
+
+
+## Omnichannel SMS and voice expansion
+The approved architecture and phased plan are in [the omnichannel implementation plan](docs/OMNICHANNEL_COMMUNICATIONS_IMPLEMENTATION_PLAN.md). The first SMS adapter uses Africa's Talking; setup and callback instructions are in [the SMS integration guide](docs/AFRICAS_TALKING_SMS_SETUP.md).
+
+
+## Two-way SMS (Africa's Talking)
+
+ARA's first SMS adapter is Africa's Talking, selected as the Kenya-first option because its published support information lists two-way SMS in Kenya. The company owner/admin creates an `africas_talking_sms` connection in Company CRM > Integrations. Set `externalAccountId` to the approved sender ID or shortcode and encrypted credentials `username`, `apiKey`, `environment` (`sandbox` or `production`) and `webhookVerifyToken` (unique random secret, minimum 32 characters). Activation checks configuration presence; it does not replace sender-ID approval or a sandbox/live delivery test.
+
+Configure HTTPS callbacks:
+- Incoming: `POST /webhooks/africas-talking/sms/incoming?token=<webhookVerifyToken>`
+- Delivery report: `POST /webhooks/africas-talking/sms/delivery-report?token=<webhookVerifyToken>`
+
+Inbound messages enter the existing shared AI worker and company inbox. Outbound replies use approval gates, subscription quota reservations, retry handling and provider IDs. Delivery reports reconcile provider acceptance with delivered/failed state. STOP/UNSUBSCRIBE/CANCEL/END/QUIT opt the contact out; START/UNSTOP/YES opt them back in; HELP returns opt-out instructions. Opt-out suppression is checked again at send time. Marketing campaigns must require explicit purpose-specific opt-in.
+
+See [Africa's Talking SMS setup](docs/AFRICAS_TALKING_SMS_SETUP.md). This integration is not live until the company supplies valid credentials, configures provider callbacks, obtains sender-ID approval and completes sandbox and production pilot checks.

@@ -35,7 +35,7 @@ Authorization: Bearer YOUR_ARA_API_KEY
 }
 ```
 
-Supported channel values: `web`, `whatsapp`, `email`, `instagram`, `tiktok`, `other`.
+Supported channel values: `web`, `whatsapp`, `email`, `instagram`, `tiktok`, `sms`, `other`.
 
 The response includes the new conversation `id`. Keep it on your server.
 
