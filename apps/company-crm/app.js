@@ -139,8 +139,9 @@ function applyCompanyBrand(profile){
 }
 
 function applyUiLanguage(language){
-  if(language!=='sw')return;
-  var labels={overview:'Muhtasari',inbox:'Kikasha',handoff:'Msaada wa mfanyakazi',approvals:'Idhini za AI',channels:'Miunganisho', 'api-keys':'API ya Wasanidi',knowledge:'Maarifa',billing:'Malipo','ai-usage':'Matumizi ya AI',team:'Timu',settings:'Mipangilio'};
+  var english={overview:'Overview',inbox:'Inbox',handoff:'Human handoff',approvals:'AI Approvals',channels:'Integrations','api-keys':'Developer API',knowledge:'Knowledge',billing:'Billing','ai-usage':'AI Usage',team:'Team',settings:'Settings'};
+  var swahili={overview:'Muhtasari',inbox:'Kikasha',handoff:'Msaada wa mfanyakazi',approvals:'Idhini za AI',channels:'Miunganisho','api-keys':'API ya Wasanidi',knowledge:'Maarifa',billing:'Malipo','ai-usage':'Matumizi ya AI',team:'Timu',settings:'Mipangilio'};
+  var labels=language==='sw'?swahili:english;
   document.querySelectorAll('.nav [data-page]').forEach(function(button){var key=button.dataset.page,icon=button.querySelector('.nav-icon');if(labels[key])button.innerHTML=(icon?icon.outerHTML:'')+labels[key];});
   var select=document.getElementById('mobile-page');if(select)Array.from(select.options).forEach(function(option){if(labels[option.value])option.textContent=labels[option.value];});
 }
