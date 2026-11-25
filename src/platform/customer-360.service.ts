@@ -7,7 +7,12 @@ export class Customer360Service {
   constructor(private readonly db: DatabaseService) {}
 
   private identityExpression(alias = 'c') {
-    return `COALESCE(NULLIF(CASE WHEN position('@' in lower(trim(${alias}.customer_contact)))>0 THEN lower(trim(${alias}.customer_contact)) WHEN regexp_replace(trim(${alias}.customer_contact), '\\D', '', 'g') ~ '^[0-9]{8,15}
+    const contact = alias + '.customer_contact';
+    const digits = "regexp_replace(trim(" + contact + "), '[^0-9]', '', 'g')";
+    return "COALESCE(NULLIF(CASE WHEN position('@' in lower(trim(" + contact + ")))>0 " +
+      "THEN lower(trim(" + contact + ")) WHEN " + digits + " ~ '^[0-9]{8,15}$' " +
+      "THEN " + digits + " ELSE lower(trim(" + contact + ")) END, ''), " +
+      "'conversation:' || " + alias + ".id::text)";
   }
 
   async list(user: AraUser) {
