@@ -47,7 +47,7 @@ describe('ChannelConnectionsService', () => {
     const service=new ChannelConnectionsService(db,vault,{assertChannelAvailable:jest.fn().mockResolvedValue(undefined)} as any);
     const result=await service.verifyAndActivate(user,saved.id);
     expect(result.connection.status).toBe('active');
-    expect(result.message).toContain('test a real inbound and outbound message');
+    expect(result.message).toContain('test a real inbound and outbound interaction');
     expect(client.query).toHaveBeenCalledTimes(2);
   });
 
