@@ -26,9 +26,9 @@ export class AfricaTalkingSmsService implements OnModuleInit,OnModuleDestroy {
     const to=String(payload?.to||'').trim();
     const text=String(payload?.text||'').trim();
     const providerId=String(payload?.id||payload?.messageId||'').trim();
-    if(!/^\\+?[1-9]\\d{7,14}$/.test(from)||!text||text.length>5000||!providerId)throw new UnauthorizedException('Incomplete or invalid incoming SMS callback');
+    if(!/^\+?[1-9]\d{7,14}$/.test(from)||!text||text.length>5000||!providerId)throw new UnauthorizedException('Incomplete or invalid incoming SMS callback');
     if(connection.externalAccountId&&to&&connection.externalAccountId!==to)throw new UnauthorizedException('SMS destination does not match this tenant connection');
-    const keyword=text.trim().toUpperCase().replace(/[.!\\s]+$/g,'');
+    const keyword=text.trim().toUpperCase().replace(/[.!\s]+$/g,'');
     const keywordReplies:Record<string,string>={STOP:'You have been unsubscribed from SMS messages. Reply START to resubscribe.',UNSUBSCRIBE:'You have been unsubscribed from SMS messages. Reply START to resubscribe.',CANCEL:'You have been unsubscribed from SMS messages. Reply START to resubscribe.',END:'You have been unsubscribed from SMS messages. Reply START to resubscribe.',QUIT:'You have been unsubscribed from SMS messages. Reply START to resubscribe.',START:'You are now subscribed to SMS messages.',UNSTOP:'You are now subscribed to SMS messages.',YES:'You are now subscribed to SMS messages.',HELP:'ARA SMS help: reply STOP to opt out or START to resubscribe.'};
     const stop=['STOP','UNSUBSCRIBE','CANCEL','END','QUIT'].includes(keyword);
     const start=['START','UNSTOP','YES'].includes(keyword);
