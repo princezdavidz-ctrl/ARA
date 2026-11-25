@@ -118,3 +118,7 @@ A channel is not complete merely because an API request succeeds. It must suppor
 
 ### Kenya-first SMS provider decision
 The first SMS adapter is Africa's Talking. Its published support matrix lists Kenya two-way SMS and Voice; Twilio's Kenya SMS guidance currently says two-way SMS is not supported, while its Kenya Voice guidance lists inbound and outbound calling. This makes Africa's Talking the preferred initial two-way SMS provider for the Kenya launch. This is a technical/provider-fit decision, not proof of account approval, sender-ID availability, callback configuration or live readiness. See `docs/AFRICAS_TALKING_SMS_SETUP.md`.
+
+
+### Kenya-first Voice provider decision
+Use Africa's Talking as the initial Kenya Voice adapter alongside the SMS adapter. Its published Voice service covers Kenya and supports inbound/outbound calls, IVR, call transfer and queues. Use a regular voice-enabled number for two-way calling; some virtualized-number configurations restrict outbound calls. Keep provider interfaces replaceable for other markets. ARA's first voice release provides call lifecycle tracking and a configured human transfer destination; dynamic staff queues and the AI speech agent remain subsequent work packages. See `docs/AFRICAS_TALKING_VOICE_SETUP.md`.
