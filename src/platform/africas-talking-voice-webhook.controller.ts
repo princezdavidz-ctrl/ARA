@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Query, Res } from '@nestjs/common';
+import { Body, Controller, HttpCode, Post, Query, Res } from '@nestjs/common';
 import { Response } from 'express';
 import { AfricaTalkingVoiceService } from './africas-talking-voice.service';
 
@@ -9,5 +9,5 @@ export class AfricaTalkingVoiceWebhookController {
     const xml=await this.voice.handleCallback(token,body);
     return response.status(200).type('text/plain').send(xml);
   }
-  @Post('events') events(@Query('token') token:string,@Body() body:any){return this.voice.handleEvent(token,body);}
+  @HttpCode(200) @Post('events') events(@Query('token') token:string,@Body() body:any){return this.voice.handleEvent(token,body);}
 }
