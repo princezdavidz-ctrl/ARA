@@ -127,6 +127,16 @@ export class CampaignsService {
        ON CONFLICT(agency_id,channel,contact_key) DO UPDATE SET consent_status=EXCLUDED.consent_status,source=EXCLUDED.source,updated_by=EXCLUDED.updated_by,updated_at=now()`,
       [user.agencyId,channel,key,status,source,user.id],
     );
+    if (status === 'opted_out') {
+      await this.db.query(
+        `UPDATE messages m SET delivery_status='failed',delivery_started_at=NULL,delivery_error='Campaign suppressed because the contact opted out'
+         FROM conversations c
+         WHERE c.id=m.conversation_id AND c.agency_id=m.agency_id AND c.agency_id=$1
+           AND c.channel=$2 AND lower(trim(c.customer_contact))=$3
+           AND m.sender_type='campaign' AND m.direction='outbound' AND m.delivery_status='queued'`,
+        [user.agencyId,channel,key],
+      );
+    }
     return { channel, contact, status, updated: true };
   }
 
