@@ -177,13 +177,14 @@ function mountCompanyAssistant(){
   });
 }
 function renderShell(){
-  app.innerHTML='<div class="app-shell"><aside class="sidebar"><div class="brand brand-lockup"><span class="brand-mark">✦</span><span>ARA<small>COMPANY CRM</small></span></div><nav class="nav"><span class="nav-label">WORKSPACE</span><button data-page="overview"><span class="nav-icon">⌂</span>Overview</button><button data-page="inbox"><span class="nav-icon">▤</span>Inbox</button><button data-page="customers"><span class="nav-icon">♙</span>Customers</button><button data-page="handoff"><span class="nav-icon">↗</span>Human handoff</button><button data-page="approvals"><span class="nav-icon">✓</span>AI Approvals</button><button data-page="channels"><span class="nav-icon">⌁</span>Integrations</button><button data-page="voice-calls"><span class="nav-icon">☎</span>Voice Calls</button><button data-page="api-keys"><span class="nav-icon">⌘</span>Developer API</button><button data-page="knowledge"><span class="nav-icon">▧</span>Knowledge</button><span class="nav-label">ACCOUNT</span><button data-page="billing"><span class="nav-icon">◇</span>Billing</button><button data-page="ai-usage"><span class="nav-icon">✧</span>AI Usage</button><button data-page="team"><span class="nav-icon">♙</span>Team</button><button data-page="settings"><span class="nav-icon">⚙</span>Settings</button></nav><div class="side-foot">Tenant-isolated workspace<br>Company data stays within your account.</div></aside><header class="mobile-bar"><div class="brand-lockup"><span class="brand-mark">✦</span><strong>ARA</strong></div><select id="mobile-page" aria-label="Navigate workspace"><option value="overview">Overview</option><option value="inbox">Inbox</option><option value="customers">Customers</option><option value="handoff">Human handoff</option><option value="approvals">AI Approvals</option><option value="channels">Integrations</option><option value="voice-calls">Voice Calls</option><option value="api-keys">Developer API</option><option value="knowledge">Knowledge</option><option value="billing">Billing</option><option value="ai-usage">AI Usage</option><option value="team">Team</option><option value="settings">Settings</option></select></header><main class="main"><header class="topbar"><div><span class="eyebrow">COMPANY WORKSPACE</span><h1 id="page-title">Overview</h1><p id="page-subtitle">Company operations at a glance</p></div><div class="identity"><span id="identity"></span><button class="secondary" id="logout">Sign out</button></div></header><section id="content"><div class="empty">Loading workspace…</div></section></main></div>';
+  app.innerHTML='<div class="app-shell"><aside class="sidebar"><div class="brand brand-lockup"><span class="brand-mark">✦</span><span>ARA<small>COMPANY CRM</small></span></div><nav class="nav"><span class="nav-label">WORKSPACE</span><button data-page="overview"><span class="nav-icon">⌂</span>Overview</button><button data-page="inbox"><span class="nav-icon">▤</span>Inbox</button><button data-page="customers"><span class="nav-icon">♙</span>Customers</button><button data-page="campaigns"><span class="nav-icon">◉</span>Campaigns</button><button data-page="handoff"><span class="nav-icon">↗</span>Human handoff</button><button data-page="approvals"><span class="nav-icon">✓</span>AI Approvals</button><button data-page="channels"><span class="nav-icon">⌁</span>Integrations</button><button data-page="voice-calls"><span class="nav-icon">☎</span>Voice Calls</button><button data-page="api-keys"><span class="nav-icon">⌘</span>Developer API</button><button data-page="knowledge"><span class="nav-icon">▧</span>Knowledge</button><span class="nav-label">ACCOUNT</span><button data-page="billing"><span class="nav-icon">◇</span>Billing</button><button data-page="ai-usage"><span class="nav-icon">✧</span>AI Usage</button><button data-page="team"><span class="nav-icon">♙</span>Team</button><button data-page="settings"><span class="nav-icon">⚙</span>Settings</button></nav><div class="side-foot">Tenant-isolated workspace<br>Company data stays within your account.</div></aside><header class="mobile-bar"><div class="brand-lockup"><span class="brand-mark">✦</span><strong>ARA</strong></div><select id="mobile-page" aria-label="Navigate workspace"><option value="overview">Overview</option><option value="inbox">Inbox</option><option value="customers">Customers</option><option value="campaigns">Campaigns</option><option value="handoff">Human handoff</option><option value="approvals">AI Approvals</option><option value="channels">Integrations</option><option value="voice-calls">Voice Calls</option><option value="api-keys">Developer API</option><option value="knowledge">Knowledge</option><option value="billing">Billing</option><option value="ai-usage">AI Usage</option><option value="team">Team</option><option value="settings">Settings</option></select></header><main class="main"><header class="topbar"><div><span class="eyebrow">COMPANY WORKSPACE</span><h1 id="page-title">Overview</h1><p id="page-subtitle">Company operations at a glance</p></div><div class="identity"><span id="identity"></span><button class="secondary" id="logout">Sign out</button></div></header><section id="content"><div class="empty">Loading workspace…</div></section></main></div>';
   mountCompanyAssistant();
   document.getElementById('identity').textContent=(user?user.fullName+' · '+user.role:'');
   api('/platform/brand-profile').then(applyCompanyBrand).catch(function(){});
 
   if(!['owner','admin'].includes(user&&user.role)){document.querySelector('[data-page="api-keys"]').hidden=true;var apiKeysOption=document.querySelector('#mobile-page option[value="api-keys"]');if(apiKeysOption)apiKeysOption.hidden=true;document.querySelector('[data-page="billing"]').hidden=true;var billingOption=document.querySelector('#mobile-page option[value="billing"]');if(billingOption)billingOption.hidden=true;}
   if(!['owner','admin','manager'].includes(user&&user.role)){document.querySelector('[data-page="approvals"]').hidden=true;var approvalsOption=document.querySelector('#mobile-page option[value="approvals"]');if(approvalsOption)approvalsOption.hidden=true;document.querySelector('[data-page="team"]').hidden=true;var teamOption=document.querySelector('#mobile-page option[value="team"]');if(teamOption)teamOption.hidden=true;}
+  if(!['owner','admin','manager'].includes(user&&user.role)){var campaignsNav=document.querySelector('[data-page="campaigns"]');if(campaignsNav)campaignsNav.hidden=true;var campaignsOption=document.querySelector('#mobile-page option[value="campaigns"]');if(campaignsOption)campaignsOption.hidden=true;}
   app.querySelectorAll('[data-page]').forEach(function(button){button.addEventListener('click',function(){page=button.dataset.page;loadPage();});});var mobilePage=document.getElementById('mobile-page');if(mobilePage){mobilePage.value=page;mobilePage.onchange=function(){page=mobilePage.value;loadPage();};}
   document.getElementById('logout').addEventListener('click',logout);
   loadPage();
@@ -234,10 +235,79 @@ async function settings(){
   };
 }
 
+async function campaigns(){
+  pageTitle('Campaigns','Build audiences and send consent-based customer campaigns');
+  if(!['owner','admin','manager'].includes(user&&user.role)){
+    document.getElementById('content').innerHTML='<div class="notice">Campaign management is available to company owners, administrators and managers.</div>';return;
+  }
+  var rows=await api('/platform/campaigns');
+  var campaignRows=(rows||[]).map(function(c){
+    return '<tr><td><strong>'+esc(c.name)+'</strong><small class="subtle">'+esc(c.channel)+'</small></td><td><span class="pill">'+esc(c.status)+'</span></td><td>'+esc(c.recipientCount||0)+'</td><td>'+esc(c.sentCount||0)+'</td><td>'+esc(c.failedCount||0)+'</td><td>'+esc(fmtDate(c.scheduledAt||c.createdAt))+'</td><td><button class="secondary" data-campaign-view="'+esc(c.id)+'">View</button>'+(c.status==='draft'||c.status==='scheduled'?'<button data-campaign-send="'+esc(c.id)+'">Queue send</button>':'')+'</td></tr>';
+  });
+  document.getElementById('content').innerHTML=
+    '<div class="notice">Campaigns are tenant-scoped and only include contacts with recorded opt-in consent. SMS recipients must have opted in through the SMS consent flow. Campaign messages use your existing channel connections and subscription message limits. Scheduled campaigns are saved for a future scheduling worker; they are not auto-dispatched yet.</div>'+
+    '<div class="section-head"><h2>Campaigns</h2><span class="subtle">'+(rows||[]).length+' recent campaigns</span></div>'+
+    table(['Campaign','Status','Recipients','Sent','Failed','Created / scheduled','Actions'],campaignRows)+
+    '<div class="section-head"><h2>Create a campaign</h2><span class="subtle">Preview the eligible audience before saving.</span></div>'+
+    '<form id="campaign-form" class="panel form-grid" style="padding:18px">'+
+      '<label class="field">Campaign name<input name="name" required minlength="2" maxlength="120" placeholder="e.g. November customer update"></label>'+
+      '<label class="field">Channel<select name="channel" required><option value="sms">SMS</option><option value="email">Email</option><option value="whatsapp">WhatsApp</option><option value="instagram">Instagram</option><option value="tiktok">TikTok</option></select></label>'+
+      '<label class="field wide">Email subject <span class="optional">Required for email</span><input name="subject" maxlength="500" placeholder="Your campaign subject"></label>'+
+      '<label class="field wide">Message<textarea name="body" required maxlength="12000" rows="5" placeholder="Write the message customers will receive"></textarea></label>'+
+      '<label class="field">Conversation status<select name="status"><option value="any">Any status</option><option value="open">Open</option><option value="pending">Pending</option><option value="closed">Closed</option></select></label>'+
+      '<label class="field">Contacted within days <span class="optional">Optional</span><input name="lastContactDays" type="number" min="1" max="3650" placeholder="e.g. 90"></label>'+
+      '<label class="field wide">Search audience <span class="optional">Optional</span><input name="search" maxlength="100" placeholder="Customer name, email or phone"></label>'+
+      '<div class="wide" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button type="button" class="secondary" id="campaign-preview">Preview eligible audience</button><button type="submit">Save draft</button><span id="campaign-preview-result" class="subtle" aria-live="polite"></span></div>'+
+      '<p id="campaign-error" class="error wide" role="alert"></p></form>'+
+    '<div class="section-head"><h2>Record marketing consent</h2><span class="subtle">Keep the opt-in source for audit purposes.</span></div>'+
+    '<form id="campaign-consent-form" class="panel form-grid" style="padding:18px">'+
+      '<label class="field">Channel<select name="channel"><option value="email">Email</option><option value="whatsapp">WhatsApp</option><option value="instagram">Instagram</option><option value="tiktok">TikTok</option></select></label>'+
+      '<label class="field">Contact identifier<input name="contact" required maxlength="320" placeholder="Email, phone or channel contact ID"></label>'+
+      '<label class="field">Consent status<select name="status"><option value="opted_in">Opted in</option><option value="opted_out">Opted out</option></select></label>'+
+      '<label class="field">Consent source<input name="source" required maxlength="200" placeholder="e.g. Website signup form · 2026-11-26"></label>'+
+      '<div class="wide"><button type="submit" class="secondary">Save consent</button><p id="campaign-consent-error" class="error" role="alert"></p><p id="campaign-consent-success" class="subtle" role="status"></p></div></form>';
+  var form=document.getElementById('campaign-form');
+  function campaignPayload(){
+    var data=new FormData(form),filters={status:String(data.get('status')||'any')};
+    if(String(data.get('lastContactDays')||'').trim())filters.lastContactDays=Number(data.get('lastContactDays'));
+    if(String(data.get('search')||'').trim())filters.search=String(data.get('search')).trim();
+    return {name:String(data.get('name')||'').trim(),channel:String(data.get('channel')||''),subject:String(data.get('subject')||'').trim(),body:String(data.get('body')||'').trim(),filters:filters};
+  }
+  document.getElementById('campaign-preview').onclick=async function(){
+    var button=this,result=document.getElementById('campaign-preview-result');button.disabled=true;result.textContent='Checking consent and audience…';setError('campaign-error','');
+    try{var payload=campaignPayload(),preview=await api('/platform/campaigns/preview',{method:'POST',body:JSON.stringify({channel:payload.channel,filters:payload.filters})});result.textContent=preview.eligibleRecipients+' eligible opted-in recipient(s).';}
+    catch(error){result.textContent='';setError('campaign-error',error);}
+    finally{button.disabled=false;}
+  };
+  form.onsubmit=async function(event){
+    event.preventDefault();if(!form.reportValidity())return;var button=form.querySelector('button[type="submit"]');button.disabled=true;setError('campaign-error','');
+    try{await api('/platform/campaigns',{method:'POST',body:JSON.stringify(campaignPayload())});await campaigns();}
+    catch(error){setError('campaign-error',error);}
+    finally{button.disabled=false;}
+  };
+  document.getElementById('campaign-consent-form').onsubmit=async function(event){
+    event.preventDefault();var consentForm=event.currentTarget,button=consentForm.querySelector('button[type="submit"]'),data=new FormData(consentForm);button.disabled=true;setError('campaign-consent-error','');document.getElementById('campaign-consent-success').textContent='';
+    try{await api('/platform/campaigns/consent',{method:'POST',body:JSON.stringify({channel:data.get('channel'),contact:data.get('contact'),status:data.get('status'),source:data.get('source')})});document.getElementById('campaign-consent-success').textContent='Consent preference saved.';consentForm.reset();}
+    catch(error){setError('campaign-consent-error',error);}
+    finally{button.disabled=false;}
+  };
+  document.querySelectorAll('[data-campaign-send]').forEach(function(button){button.onclick=async function(){
+    if(!confirm('Queue this campaign for delivery to all eligible opted-in recipients?'))return;button.disabled=true;
+    try{var result=await api('/platform/campaigns/'+encodeURIComponent(button.dataset.campaignSend)+'/send',{method:'POST',body:'{}'});alert(result.queuedRecipients+' recipient(s) queued.');await campaigns();}
+    catch(error){alert(error.message);}finally{button.disabled=false;}
+  };});
+  document.querySelectorAll('[data-campaign-view]').forEach(function(button){button.onclick=async function(){
+    try{var result=await api('/platform/campaigns/'+encodeURIComponent(button.dataset.campaignView)),campaign=result.campaign,recipients=result.recipients||[];
+      var recipientRows=recipients.map(function(r){return '<tr><td>'+esc(r.customerName||r.contact)+'</td><td>'+esc(r.contact)+'</td><td><span class="pill">'+esc(r.status)+'</span></td><td>'+esc(r.failureReason||'—')+'</td></tr>';});
+      document.getElementById('content').innerHTML='<div class="section-head"><button class="secondary" id="campaigns-back">← Campaigns</button><span class="pill">'+esc(campaign.status)+'</span></div><section class="panel" style="padding:20px;margin-bottom:18px"><h2>'+esc(campaign.name)+'</h2><p class="subtle">'+esc(campaign.channel)+' · '+esc(campaign.subject||'')+'</p><p>'+esc(campaign.body)+'</p></section><div class="section-head"><h2>Recipients</h2><span class="subtle">'+recipients.length+' recent</span></div>'+table(['Customer','Contact','Delivery status','Details'],recipientRows);
+      document.getElementById('campaigns-back').onclick=campaigns;
+    }catch(error){alert(error.message);}
+  };});
+}
 async function loadPage(){
   if(handoffRefreshTimer){clearInterval(handoffRefreshTimer);handoffRefreshTimer=null;}
   var content=document.getElementById('content');content.innerHTML='<div class="empty">Loading…</div>';
-  try{if(page==='overview')await overview();else if(page==='inbox')await inbox();else if(page==='customers')await customers();else if(page==='handoff')await handoff();else if(page==='approvals')await approvals();else if(page==='channels')await channels();else if(page==='voice-calls')await voiceCalls();else if(page==='api-keys')await apiKeys();else if(page==='knowledge')await knowledge();else if(page==='billing')await billing();else if(page==='ai-usage')await aiUsage();else if(page==='team')await team();else if(page==='settings')await settings();
+  try{if(page==='overview')await overview();else if(page==='inbox')await inbox();else if(page==='customers')await customers();else if(page==='campaigns')await campaigns();else if(page==='handoff')await handoff();else if(page==='approvals')await approvals();else if(page==='channels')await channels();else if(page==='voice-calls')await voiceCalls();else if(page==='api-keys')await apiKeys();else if(page==='knowledge')await knowledge();else if(page==='billing')await billing();else if(page==='ai-usage')await aiUsage();else if(page==='team')await team();else if(page==='settings')await settings();
     if(page==='handoff')handoffRefreshTimer=setInterval(function(){if(page==='handoff')handoff().catch(function(){});},15000);
   }
   catch(error){content.innerHTML='<div class="panel empty"><p>'+esc(error.message)+'</p><button class="secondary" id="retry">Retry</button></div>';var retry=document.getElementById('retry');if(retry)retry.onclick=loadPage;}

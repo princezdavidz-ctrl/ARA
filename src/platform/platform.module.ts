@@ -33,5 +33,12 @@ import { AfricaTalkingVoiceWebhookController } from './africas-talking-voice-web
 import { AfricaTalkingVoiceService } from './africas-talking-voice.service';
 import { Customer360Controller } from './customer-360.controller';
 import { Customer360Service } from './customer-360.service';
-@Module({ controllers: [PlatformController, LeadController, PlatformAdminController, ChannelConnectionsController, BillingController, AdminIntegrationsController, AiUsageController, PublicSupportController, PublicApiController, VoiceController, AfricaTalkingVoiceWebhookController, Customer360Controller], providers: [PlatformService, LeadService, PlatformAdminService, ChannelConnectionsService, ChannelCredentialVault, BillingService, MpesaService, AdminIntegrationsService, AiUsageService, SubscriptionLimitsService, EmailOtpService, SupportService, AfricaTalkingVoiceService, Customer360Service, AuthGuard, PlatformAdminGuard, ConfigService, DatabaseService, OpenAiService, AiOrchestratorService, LocalLlmService], exports: [AuthGuard, ChannelCredentialVault, BillingService] })
+import { CampaignsController } from './campaigns.controller';
+import { CampaignsService } from './campaigns.service';
+
+@Module({
+  controllers: [PlatformController, LeadController, PlatformAdminController, ChannelConnectionsController, BillingController, AdminIntegrationsController, AiUsageController, PublicSupportController, PublicApiController, VoiceController, AfricaTalkingVoiceWebhookController, Customer360Controller, CampaignsController],
+  providers: [PlatformService, LeadService, PlatformAdminService, ChannelConnectionsService, ChannelCredentialVault, BillingService, MpesaService, AdminIntegrationsService, AiUsageService, SubscriptionLimitsService, EmailOtpService, SupportService, AfricaTalkingVoiceService, Customer360Service, CampaignsService, AuthGuard, PlatformAdminGuard, ConfigService, DatabaseService, OpenAiService, AiOrchestratorService, LocalLlmService],
+  exports: [AuthGuard, ChannelCredentialVault, BillingService]
+})
 export class PlatformModule {}
