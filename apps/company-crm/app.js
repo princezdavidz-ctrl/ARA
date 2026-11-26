@@ -235,7 +235,7 @@ async function settings(){
   };
 }
 
-async async function campaigns(){
+async function campaigns(){
   pageTitle('Campaigns','Build audiences and send consent-based customer campaigns');
   if(!['owner','admin','manager'].includes(user&&user.role)){
     document.getElementById('content').innerHTML='<div class="notice">Campaign management is available to company owners, administrators and managers.</div>';return;
