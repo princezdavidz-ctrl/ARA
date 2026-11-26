@@ -20,7 +20,7 @@ export class CampaignsService {
     const allowed = ['status','lastContactDays','search'];
     if (Object.keys(value).some(key => !allowed.includes(key))) throw new BadRequestException('Unsupported audience filter.');
     if (value.status !== undefined && !['open','pending','closed','any'].includes(String(value.status))) throw new BadRequestException('Invalid conversation status filter.');
-    if (value.lastContactDays !== undefined && (!Number.isInteger(value.lastContactDays) || Number(value.lastContactDays) < 1 || Number(value.lastContactDays) > 3650)) throw new BadRequestException('lastContactDays must be an integer between 1 and 3650.');
+    if (value.lastContactDays !== undefined && (typeof value.lastContactDays !== 'number' || !Number.isInteger(value.lastContactDays) || value.lastContactDays < 1 || value.lastContactDays > 3650)) throw new BadRequestException('lastContactDays must be an integer between 1 and 3650.');
     if (value.search !== undefined && (typeof value.search !== 'string' || value.search.length > 100)) throw new BadRequestException('Search filter must be 100 characters or fewer.');
     return value;
   }
