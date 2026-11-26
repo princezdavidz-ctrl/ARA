@@ -134,12 +134,13 @@ export class CampaignsService {
     this.requireManager(user);
     return this.db.transaction(async client => {
       const locked = await client.query(
-        "SELECT id,name,channel,subject,body,filters,status FROM campaigns WHERE id=$1 AND agency_id=$2 FOR UPDATE",
+        "SELECT id,name,channel,subject,body,filters,status,scheduled_at AS "scheduledAt" FROM campaigns WHERE id=$1 AND agency_id=$2 FOR UPDATE",
         [id,user.agencyId],
       );
       const campaign = locked.rows[0];
       if (!campaign) throw new NotFoundException('Campaign not found.');
       if (!['draft','scheduled'].includes(campaign.status)) throw new BadRequestException('Only draft or scheduled campaigns can be queued.');
+      if (campaign.status === 'scheduled' && campaign.scheduledAt && new Date(campaign.scheduledAt).getTime() > Date.now()) throw new BadRequestException('This campaign is scheduled for a future time and cannot be sent early.');
       const channel = campaign.channel as CampaignChannel;
       const filters = this.validateFilters(campaign.filters);
       const args: unknown[] = [user.agencyId,channel];
