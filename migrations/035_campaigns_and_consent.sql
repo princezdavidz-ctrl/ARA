@@ -48,3 +48,29 @@ CREATE TABLE IF NOT EXISTS campaign_recipients (
 );
 CREATE INDEX IF NOT EXISTS campaign_recipients_tenant_status_idx
   ON campaign_recipients(agency_id,campaign_id,status);
+
+CREATE OR REPLACE FUNCTION ara_sync_campaign_recipient_status() RETURNS trigger AS $$
+BEGIN
+  IF NEW.delivery_status IS DISTINCT FROM OLD.delivery_status THEN
+    UPDATE campaign_recipients
+    SET status=CASE NEW.delivery_status
+      WHEN 'sent' THEN 'sent'
+      WHEN 'delivered' THEN 'delivered'
+      WHEN 'failed' THEN 'failed'
+      ELSE status END,
+      failure_reason=CASE WHEN NEW.delivery_status='failed' THEN left(COALESCE(NEW.delivery_error,'Delivery failed'),1000) ELSE failure_reason END,
+      updated_at=now()
+    WHERE message_id=NEW.id AND agency_id=NEW.agency_id;
+    UPDATE campaigns c SET status='completed',completed_at=now(),updated_at=now()
+    WHERE c.id IN (SELECT campaign_id FROM campaign_recipients WHERE message_id=NEW.id AND agency_id=NEW.agency_id)
+      AND c.status='queued'
+      AND NOT EXISTS (SELECT 1 FROM campaign_recipients r WHERE r.campaign_id=c.id AND r.agency_id=c.agency_id AND r.status='queued');
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS messages_sync_campaign_recipient_status ON messages;
+CREATE TRIGGER messages_sync_campaign_recipient_status
+AFTER UPDATE OF delivery_status ON messages
+FOR EACH ROW EXECUTE FUNCTION ara_sync_campaign_recipient_status();
