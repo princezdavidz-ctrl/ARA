@@ -134,7 +134,7 @@ export class CampaignsService {
     this.requireManager(user);
     return this.db.transaction(async client => {
       const locked = await client.query(
-        "SELECT id,name,channel,subject,body,filters,status,scheduled_at AS "scheduledAt" FROM campaigns WHERE id=$1 AND agency_id=$2 FOR UPDATE",
+        `SELECT id,name,channel,subject,body,filters,status,scheduled_at AS "scheduledAt" FROM campaigns WHERE id=$1 AND agency_id=$2 FOR UPDATE`,
         [id,user.agencyId],
       );
       const campaign = locked.rows[0];
