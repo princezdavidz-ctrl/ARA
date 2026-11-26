@@ -184,6 +184,7 @@ function renderShell(){
 
   if(!['owner','admin'].includes(user&&user.role)){document.querySelector('[data-page="api-keys"]').hidden=true;var apiKeysOption=document.querySelector('#mobile-page option[value="api-keys"]');if(apiKeysOption)apiKeysOption.hidden=true;document.querySelector('[data-page="billing"]').hidden=true;var billingOption=document.querySelector('#mobile-page option[value="billing"]');if(billingOption)billingOption.hidden=true;}
   if(!['owner','admin','manager'].includes(user&&user.role)){document.querySelector('[data-page="approvals"]').hidden=true;var approvalsOption=document.querySelector('#mobile-page option[value="approvals"]');if(approvalsOption)approvalsOption.hidden=true;document.querySelector('[data-page="team"]').hidden=true;var teamOption=document.querySelector('#mobile-page option[value="team"]');if(teamOption)teamOption.hidden=true;}
+  if(!['owner','admin','manager'].includes(user&&user.role)){var campaignsNav=document.querySelector('[data-page="campaigns"]');if(campaignsNav)campaignsNav.hidden=true;var campaignsOption=document.querySelector('#mobile-page option[value="campaigns"]');if(campaignsOption)campaignsOption.hidden=true;}
   app.querySelectorAll('[data-page]').forEach(function(button){button.addEventListener('click',function(){page=button.dataset.page;loadPage();});});var mobilePage=document.getElementById('mobile-page');if(mobilePage){mobilePage.value=page;mobilePage.onchange=function(){page=mobilePage.value;loadPage();};}
   document.getElementById('logout').addEventListener('click',logout);
   loadPage();
