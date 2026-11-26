@@ -304,7 +304,7 @@ async function campaigns(){
     }catch(error){alert(error.message);}
   };});
 }
-function loadPage(){
+async function loadPage(){
   if(handoffRefreshTimer){clearInterval(handoffRefreshTimer);handoffRefreshTimer=null;}
   var content=document.getElementById('content');content.innerHTML='<div class="empty">Loading…</div>';
   try{if(page==='overview')await overview();else if(page==='inbox')await inbox();else if(page==='customers')await customers();else if(page==='campaigns')await campaigns();else if(page==='handoff')await handoff();else if(page==='approvals')await approvals();else if(page==='channels')await channels();else if(page==='voice-calls')await voiceCalls();else if(page==='api-keys')await apiKeys();else if(page==='knowledge')await knowledge();else if(page==='billing')await billing();else if(page==='ai-usage')await aiUsage();else if(page==='team')await team();else if(page==='settings')await settings();
